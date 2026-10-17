@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Winchester">
+<title>Winchester</title>
+<defs><g id="r" fill="#F3EBDD"><rect x="-66" y="-9" width="50" height="18" rx="8"/><path d="M-10 -7 H40 Q54 -7 53 0 Q52 5 44 6 L-10 8 Z"/></g></defs>
+<rect width="200" height="200" rx="44" fill="#14110F"/>
+<circle cx="100" cy="100" r="82" fill="none" stroke="#C9A66B" stroke-width="8"/>
+<g transform="translate(100 102) scale(.95)"><g transform="rotate(-38)"><use href="#r"/></g><g transform="scale(-1 1) rotate(-38)"><use href="#r"/></g></g>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Winchester Barbershop">
+<title>Winchester Barbershop</title>
+<defs><g id="r" fill="currentColor">
+  <rect x="-66" y="-5.5" width="52" height="11" rx="5.5"/>
+  <path d="M-9 -9 H38 Q57 -9 55 -1 Q53 5 44 6 L-9 8 Z"/>
+</g></defs><g fill="none" stroke="#F3EBDD">
+<circle cx="100" cy="100" r="95" stroke-width="3"/>
+<circle cx="100" cy="100" r="58" stroke-width="1.5"/>
+</g>
+<path id="wt" d="M 100 100 m -77 0 a 77 77 0 0 1 154 0" fill="none"/>
+<path id="wb" d="M 100 100 m -86 0 a 86 86 0 0 0 172 0" fill="none"/>
+<g fill="#F3EBDD" font-family="Cormorant Garamond, Georgia, serif" font-weight="600" text-anchor="middle">
+<text font-size="23" letter-spacing="5"><textPath href="#wt" startOffset="50%">WINCHESTER</textPath></text>
+<text font-size="14" letter-spacing="4"><textPath href="#wb" startOffset="50%" side="right">EST. 2019</textPath></text>
+</g>
+<g fill="#C9A66B"><circle cx="24" cy="100" r="3"/><circle cx="176" cy="100" r="3"/></g>
+<g transform="translate(100 102) scale(.78)" color="#F3EBDD">
+<g transform="rotate(-38)"><use href="#r"/></g>
+<g transform="scale(-1 1) rotate(-38)"><use href="#r"/></g>
+</g>
+</svg>
