@@ -7,18 +7,22 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Users are global (one person may work in several organizations, TZ 03 §1).
+     * Login is the phone number in E.164 form (+77010000001).
      */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            $table->string('phone', 20)->unique();
             $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
+            $table->string('email')->nullable()->unique();
+            $table->timestampTz('email_verified_at')->nullable();
             $table->string('password');
+            $table->boolean('is_superadmin')->default(false);
+            $table->string('locale', 5)->default('ru');
             $table->rememberToken();
-            $table->timestamps();
+            $table->timestampsTz();
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
@@ -37,9 +41,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('users');

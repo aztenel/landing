@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\PhoneLogin;
+use App\Http\Middleware\SetCurrentOrganization;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -26,7 +28,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(PhoneLogin::class)
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -53,6 +55,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                SetCurrentOrganization::class, // tenant context for every ERP request (TZ 03 §12)
             ]);
     }
 }

@@ -1,3 +1,15 @@
+# Prime Mobile OS
+
+ERP и витрина для магазинов телефонов (Laravel 12, PostgreSQL 16, Filament 3, Livewire 3).
+
+- Правила разработки: [`ENGINEERING.md`](ENGINEERING.md)
+- Ядро учёта (документы, журналы, проведение, права, фирмы) и API для модулей: [`docs/CORE.md`](docs/CORE.md)
+- ТЗ и архитектура: [`../docs/`](../docs/)
+
+Запуск: `php artisan migrate:fresh --seed` (вход в `/admin`: +7 701 000 00 01 / password), тесты: `php artisan test` (база `prime_mobile_test`).
+
+---
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

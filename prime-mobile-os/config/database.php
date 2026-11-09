@@ -97,6 +97,8 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Journals hash rows via to_jsonb(); timestamps must serialize identically in every session.
+            'timezone' => 'UTC',
         ],
 
         'sqlsrv' => [

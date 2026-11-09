@@ -1,0 +1,144 @@
+<?php
+
+namespace App\Domain\Tenancy\Services;
+
+use App\Domain\Money\Enums\AccountType;
+use App\Domain\Money\Enums\ArticleCode;
+use App\Domain\Money\Enums\PaymentMethodCode;
+use App\Domain\Money\Models\MoneyAccount;
+use App\Domain\Money\Models\MoneyArticle;
+use App\Domain\Money\Models\PaymentMethod;
+use App\Domain\Tenancy\Access\RoleProvisioner;
+use App\Domain\Tenancy\Access\RoleTemplates;
+use App\Domain\Tenancy\Enums\MembershipStatus;
+use App\Domain\Tenancy\Models\Membership;
+use App\Domain\Tenancy\Models\Organization;
+use App\Domain\Tenancy\Models\Store;
+use App\Domain\Tenancy\OrganizationSettings;
+use App\Models\User;
+use App\Support\Money\Currency;
+use App\Support\Tenancy\CurrentOrganization;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+
+/**
+ * Creates an organization ready to work (integrator action, TZ 03 §13 p.7): role templates with limits,
+ * money articles, first store with the starter accounts and payment methods (TZ 02 §11.4), owner membership.
+ */
+class OrganizationProvisioner
+{
+    public function __construct(private readonly RoleProvisioner $roles) {}
+
+    public function create(string $name, string $storeName, ?User $owner = null, array $settings = [], array $attributes = []): Organization
+    {
+        return DB::transaction(function () use ($name, $storeName, $owner, $settings, $attributes) {
+            new OrganizationSettings($settings); // validate
+            $org = Organization::query()->create($attributes + ['name' => $name, 'settings' => $settings]);
+            $this->provision($org);
+            CurrentOrganization::instance()->run($org, function () use ($org, $storeName, $owner) {
+                $store = Store::query()->create(['name' => $storeName, 'created_by' => $owner?->id]);
+                $this->installStarterAccounts($store);
+                if ($owner) {
+                    $this->addMember($org, $owner, RoleTemplates::OWNER);
+                }
+            });
+
+            return $org;
+        });
+    }
+
+    /** Roles + limits + money articles. Idempotent. */
+    public function provision(Organization $org): void
+    {
+        $this->roles->installFor($org);
+        CurrentOrganization::instance()->run($org, function () {
+            $sort = 0;
+            foreach (ArticleCode::cases() as $code) {
+                [$nameRu, $kind, $profit] = $code->definition();
+                MoneyArticle::query()->firstOrCreate(['code' => $code->value], [
+                    'name_ru' => $nameRu, 'kind' => $kind, 'affects_profit' => $profit,
+                    'is_system' => $kind !== 'expense', 'sort' => $sort += 10,
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Member with exactly one role (TZ 03 §2 p.3).
+     *
+     * @param  list<int>  $storeIds  empty = all stores
+     * @param  array<string, int|null>  $limits  personal limits {"L1": 1000000}
+     */
+    public function addMember(Organization $org, User $user, string $role, array $storeIds = [], array $limits = [], ?string $position = null): Membership
+    {
+        if (! array_key_exists($role, RoleTemplates::TITLES)) {
+            throw new InvalidArgumentException("Unknown role {$role}");
+        }
+
+        return CurrentOrganization::instance()->run($org, function () use ($user, $role, $storeIds, $limits, $position) {
+            $membership = Membership::query()->updateOrCreate(['user_id' => $user->id], [
+                'status' => MembershipStatus::Active, 'store_ids' => $storeIds, 'limits' => $limits ?: new \stdClass, 'position' => $position,
+            ]);
+            $user->unsetRelation('roles');
+            $user->syncRoles([$role]);
+
+            return $membership;
+        });
+    }
+
+    /**
+     * Starter accounts of TZ 02 §11.4 for a store + payment methods pointing to them. Commission percents are empty
+     * by default (question 2 of TZ 02 §15: the owner fills them in).
+     *
+     * @param  array<string, string>  $commissions  payment method code => percent, e.g. ['kaspi_qr' => '1.00']
+     * @return array<string, MoneyAccount> by code
+     */
+    public function installStarterAccounts(Store $store, array $commissions = []): array
+    {
+        $defs = [
+            'cash_kzt' => ["Касса ₸ — {$store->name}", AccountType::Cash, Currency::KZT, $store->id, false, false],
+            'cash_usd' => ["Касса $ — {$store->name}", AccountType::Cash, Currency::USD, $store->id, false, false],
+            'safe_kzt' => ['Сейф ₸', AccountType::Safe, Currency::KZT, null, false, false],
+            'safe_usd' => ['Сейф $', AccountType::Safe, Currency::USD, null, false, false],
+            'kaspi_gold' => ['Kaspi Gold', AccountType::Bank, Currency::KZT, null, false, false],
+            'kaspi_qr' => ['Kaspi QR', AccountType::Bank, Currency::KZT, null, false, false],
+            'kaspi_pay' => ['Kaspi Pay (рассрочки)', AccountType::InstallmentBank, Currency::KZT, null, false, false],
+            'halyk_terminal' => ['Терминал Halyk', AccountType::Bank, Currency::KZT, $store->id, false, false],
+            MoneyAccount::CODE_TRADEIN_OFFSET => ['Зачёт trade-in', AccountType::Technical, Currency::KZT, null, true, true],
+        ];
+        $accounts = [];
+        $sort = 0;
+        foreach ($defs as $code => [$name, $type, $currency, $storeId, $allowNegative, $hidden]) {
+            $accounts[$code] = MoneyAccount::query()->firstOrCreate(['code' => $code], [
+                'name' => $name, 'type' => $type, 'currency' => $currency, 'store_id' => $storeId,
+                'allow_negative' => $allowNegative, 'is_hidden' => $hidden, 'sort' => $sort += 10,
+            ]);
+        }
+
+        $methods = [
+            PaymentMethodCode::Cash->value => 'cash_kzt',
+            PaymentMethodCode::Card->value => 'halyk_terminal',
+            PaymentMethodCode::KaspiQr->value => 'kaspi_qr',
+            PaymentMethodCode::KaspiTransfer->value => 'kaspi_gold',
+            PaymentMethodCode::KaspiRed->value => 'kaspi_pay',
+            PaymentMethodCode::KaspiInstallment->value => 'kaspi_pay',
+            PaymentMethodCode::HalykInstallment->value => 'halyk_terminal',
+            PaymentMethodCode::Debt->value => null,
+            PaymentMethodCode::Bonus->value => null,
+            PaymentMethodCode::TradeIn->value => MoneyAccount::CODE_TRADEIN_OFFSET,
+            PaymentMethodCode::Prepayment->value => null,
+        ];
+        $sort = 0;
+        foreach ($methods as $code => $accountCode) {
+            PaymentMethod::query()->updateOrCreate(['code' => $code, 'store_id' => null], [
+                'name_ru' => PaymentMethodCode::from($code)->label(),
+                'account_id' => $accountCode ? $accounts[$accountCode]->id : null,
+                'commission_percent' => $commissions[$code] ?? '0.00',
+                'is_refundable' => ! in_array($code, ['debt', 'bonus', 'tradein', 'prepayment'], true),
+                'sort' => $sort += 10,
+            ]);
+        }
+
+        return $accounts;
+    }
+}

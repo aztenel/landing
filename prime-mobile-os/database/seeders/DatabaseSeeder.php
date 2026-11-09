@@ -2,24 +2,24 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * php artisan migrate:fresh --seed
+ *
+ * NB: no WithoutModelEvents here — tenancy, creators and append-only guards are model events.
+ * Modules add their seeders by appending lines below.
+ */
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(RolesAndPermissionsSeeder::class);
+        $this->call(CatalogSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Demo firm with demo logins (password «password»): never on a production server.
+        if (! app()->isProduction()) {
+            $this->call(PrimeMobileSeeder::class);
+        }
     }
 }
