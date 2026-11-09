@@ -1,0 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap');
+@import './tokens.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply font-sans antialiased; }
+.scroll-x { overflow-x: auto; scrollbar-width: none; }
+.scroll-x::-webkit-scrollbar { display: none; }
