@@ -1,0 +1,3292 @@
+From af14b3f54454552c21ccb2ba02d47013bb773c89 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 9 Nov 2026 20:11:10 +0000
+Subject: [PATCH] WIP: partial work before usage-limit stop (round R1)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011fUD2GwfwoYwYw2BSmKBmo
+---
+ .../app/Domain/Approvals/ApprovalKinds.php    |  92 +++
+ .../app/Domain/Approvals/ApprovalSettings.php |  39 ++
+ .../Domain/Approvals/Enums/ApprovalStatus.php |  36 ++
+ .../Exceptions/ApprovalException.php          |  14 +
+ .../Exceptions/ApprovalInvalidated.php        |  45 ++
+ .../Fingerprint/DocumentFingerprints.php      | 146 +++++
+ .../Approvals/Fingerprint/Fingerprint.php     |  71 +++
+ .../Approvals/Models/ApprovalRequest.php      | 156 +++++
+ .../Approvals/Services/ApprovalService.php    | 552 ++++++++++++++++++
+ .../Approvals/Services/ApprovalSummaries.php  | 303 ++++++++++
+ .../Services/DatabaseApprovalGate.php         | 175 ++++++
+ .../Approvals/Services/DeciderPolicy.php      |  93 +++
+ .../Approvals/Services/PreflightRollback.php  |   8 +
+ .../Notifications/Channels/NullPushSender.php |  20 +
+ .../Notifications/Channels/PushSender.php     |  23 +
+ .../Channels/TelegramChannel.php              |  66 +++
+ .../Notifications/Enums/NotificationType.php  | 124 ++++
+ .../Http/TelegramWebhookController.php        |  25 +
+ .../Jobs/DeliverNotification.php              |  70 +++
+ .../Notifications/Models/AppNotification.php  |  61 ++
+ .../Models/NotificationPreference.php         |  19 +
+ .../Notifications/Models/TelegramLink.php     |  26 +
+ .../Services/NotificationCenter.php           |  67 +++
+ .../Services/NotificationPreferences.php      |  65 +++
+ .../Notifications/Services/Notifier.php       |  81 +++
+ .../Notifications/Services/Recipients.php     |  71 +++
+ .../Notifications/Services/TelegramLinker.php |  78 +++
+ ...000_approvals_create_approval_requests.php |  78 +++
+ ...100_notifications_create_notifications.php |  71 +++
+ ...2026_11_10_110200_shifts_extend_shifts.php |  90 +++
+ ...6_11_10_110300_money_create_cash_moves.php |  47 ++
+ ...0_110400_debts_create_debt_adjustments.php |  37 ++
+ ...0500_loyalty_create_bonus_manual_lines.php |  37 ++
+ ...2026_11_10_110600_orders_create_orders.php |  75 +++
+ ...10700_audit_create_reconciliation_runs.php |  38 ++
+ 35 files changed, 2999 insertions(+)
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/ApprovalKinds.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/ApprovalSettings.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Enums/ApprovalStatus.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Exceptions/ApprovalException.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Exceptions/ApprovalInvalidated.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Fingerprint/DocumentFingerprints.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Fingerprint/Fingerprint.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Models/ApprovalRequest.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Services/ApprovalService.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Services/ApprovalSummaries.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Services/DatabaseApprovalGate.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Services/DeciderPolicy.php
+ create mode 100644 prime-mobile-os/app/Domain/Approvals/Services/PreflightRollback.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Channels/NullPushSender.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Channels/PushSender.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Channels/TelegramChannel.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Enums/NotificationType.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Http/TelegramWebhookController.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Jobs/DeliverNotification.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Models/AppNotification.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Models/NotificationPreference.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Models/TelegramLink.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Services/NotificationCenter.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Services/NotificationPreferences.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Services/Notifier.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Services/Recipients.php
+ create mode 100644 prime-mobile-os/app/Domain/Notifications/Services/TelegramLinker.php
+ create mode 100644 prime-mobile-os/database/migrations/2026_11_10_110000_approvals_create_approval_requests.php
+ create mode 100644 prime-mobile-os/database/migrations/2026_11_10_110100_notifications_create_notifications.php
+ create mode 100644 prime-mobile-os/database/migrations/2026_11_10_110200_shifts_extend_shifts.php
+ create mode 100644 prime-mobile-os/database/migrations/2026_11_10_110300_money_create_cash_moves.php
+ create mode 100644 prime-mobile-os/database/migrations/2026_11_10_110400_debts_create_debt_adjustments.php
+ create mode 100644 prime-mobile-os/database/migrations/2026_11_10_110500_loyalty_create_bonus_manual_lines.php
+ create mode 100644 prime-mobile-os/database/migrations/2026_11_10_110600_orders_create_orders.php
+ create mode 100644 prime-mobile-os/database/migrations/2026_11_10_110700_audit_create_reconciliation_runs.php
+
+diff --git a/prime-mobile-os/app/Domain/Approvals/ApprovalKinds.php b/prime-mobile-os/app/Domain/Approvals/ApprovalKinds.php
+new file mode 100644
+index 0000000..de4fd82
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/ApprovalKinds.php
+@@ -0,0 +1,92 @@
++<?php
++
++namespace App\Domain\Approvals;
++
++use App\Domain\Tenancy\Access\PermissionCatalog;
++
++/**
++ * Approval types (TZ 03 §6.1, TZ 01 П9) = the $approvalType strings of PostingContext::authorize() and of
++ * ApprovalRequired. A type not listed here (e.g. a permission code «stock.unit_edit» used as the type of a «З»
++ * permission) works with the defaults: label from PermissionCatalog, no change, owner or admin within limits.
++ *
++ *  owner_only — «решает только владелец» (§6.6 p.3);
++ *  reason     — the requester must give a reason ≥ 5 characters (§6.1 «Обязательная причина»);
++ *  change     — values the decider may change («Изменить и разрешить», §6.3 p.2) → fingerprint groups released;
++ *  confirm    — counts for the PIN threshold (300 000 ₸, «кроме скидок», §6.3 p.3).
++ */
++final class ApprovalKinds
++{
++    public const DEFAULTS = ['owner_only' => false, 'reason' => false, 'change' => [], 'release' => [], 'confirm' => true];
++
++    public const KINDS = [
++        'discount' => ['label' => 'скидка', 'change' => ['discount'], 'release' => ['discount', 'payments'], 'confirm' => false],
++        'below_cost' => ['label' => 'продажа ниже себестоимости', 'owner_only' => true],
++        'debt' => ['label' => 'долг клиенту', 'change' => ['debt', 'debt_due'], 'release' => ['payments']],
++        'debt_overdue' => ['label' => 'долг клиенту с просрочкой', 'owner_only' => true, 'change' => ['debt', 'debt_due'], 'release' => ['payments']],
++        'no_imei_check' => ['label' => 'продажа без отметки госбазы', 'reason' => true],
++        'return' => ['label' => 'возврат', 'reason' => true],
++        'expense' => ['label' => 'расход', 'reason' => true],
++        'reversal' => ['label' => 'сторно', 'reason' => true],
++        'price_change' => ['label' => 'изменение цены'],
++        'buyout' => ['label' => 'выкуп б/у'],
++        'write_off' => ['label' => 'списание', 'reason' => true],
++        'bonus_manual' => ['label' => 'бонусы вручную'],
++        'cash_adjust' => ['label' => 'корректировка кассы', 'reason' => true],
++        'debt_adjust' => ['label' => 'корректировка долга', 'reason' => true],
++        'debt_postpone' => ['label' => 'перенос срока долга'],
++        'order_cancel' => ['label' => 'отмена чужого заказа'],
++        'customer_export' => ['label' => 'выгрузка клиентов', 'owner_only' => true, 'reason' => true],
++        'staff_dismiss' => ['label' => 'увольнение сотрудника', 'owner_only' => true, 'reason' => true],
++        'new_device' => ['label' => 'вход с нового устройства', 'owner_only' => true],
++        'integrator_access' => ['label' => 'допуск интегратора', 'owner_only' => true],
++    ];
++
++    /** Fingerprint value key => [unit, title] for the texts of «Разрешено с изменением». */
++    public const VALUE_KEYS = [
++        'discount' => ['money', 'скидка'],
++        'debt' => ['money', 'долг'],
++        'debt_due' => ['date', 'срок долга'],
++    ];
++
++    public static function meta(string $kind): array
++    {
++        return (self::KINDS[$kind] ?? []) + self::DEFAULTS;
++    }
++
++    /** «скидка» — for «Дана просит разрешение: скидка». */
++    public static function label(string $kind): string
++    {
++        if (isset(self::KINDS[$kind]['label'])) {
++            return __(self::KINDS[$kind]['label']);
++        }
++
++        return mb_strtolower(PermissionCatalog::title($kind));
++    }
++
++    public static function ownerOnly(string $kind): bool
++    {
++        return (bool) self::meta($kind)['owner_only'];
++    }
++
++    public static function reasonRequired(string $kind): bool
++    {
++        return (bool) self::meta($kind)['reason'];
++    }
++
++    /** @return list<string> value keys the decider may change */
++    public static function changeable(string $kind): array
++    {
++        return self::meta($kind)['change'];
++    }
++
++    /** @return list<string> fingerprint groups no longer compared once the decider changed a value */
++    public static function released(string $kind): array
++    {
++        return self::meta($kind)['release'];
++    }
++
++    public static function countsForConfirmation(string $kind): bool
++    {
++        return (bool) self::meta($kind)['confirm'];
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/ApprovalSettings.php b/prime-mobile-os/app/Domain/Approvals/ApprovalSettings.php
+new file mode 100644
+index 0000000..7fda476
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/ApprovalSettings.php
+@@ -0,0 +1,39 @@
++<?php
++
++namespace App\Domain\Approvals;
++
++use App\Support\Tenancy\CurrentOrganization;
++
++/**
++ * Timings and rules of approvals (TZ 03 §6.4–6.6, README «Единые решения: Заявки») read from organizations.settings
++ * «approvals.*» with these defaults (Допущение: values of the TZ; the owner changes them in Э25.3 / Э26).
++ */
++final class ApprovalSettings
++{
++    public const DEFAULTS = [
++        'lifetime_minutes' => 30,        // a pending request expires
++        'reminder_minutes' => 3,         // repeated push to the owner
++        'escalate_minutes' => 5,         // visible to admins within their limits
++        'valid_minutes' => 15,           // an approval must be used within
++        'max_pending' => 3,              // per employee (§6.5 p.3)
++        'escalate_to_admins' => true,    // Э25.3 «Владелец, а через 5 минут — и Админ» (default)
++    ];
++
++    public static function get(string $key): mixed
++    {
++        $org = CurrentOrganization::instance()->require();
++
++        return $org->settings()->get('approvals.'.$key, self::DEFAULTS[$key] ?? null);
++    }
++
++    public static function minutes(string $key): int
++    {
++        return max(0, (int) self::get($key));
++    }
++
++    /** PIN before «Разрешить» above this amount, tiyn (core setting approvals.confirm_threshold, 300 000 ₸). */
++    public static function confirmThreshold(): int
++    {
++        return (int) CurrentOrganization::instance()->require()->settings()->get('approvals.confirm_threshold', 30000000);
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Enums/ApprovalStatus.php b/prime-mobile-os/app/Domain/Approvals/Enums/ApprovalStatus.php
+new file mode 100644
+index 0000000..016162d
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Enums/ApprovalStatus.php
+@@ -0,0 +1,36 @@
++<?php
++
++namespace App\Domain\Approvals\Enums;
++
++/**
++ * Life of a request (TZ 03 §6.4): pending (30 min) → approved (valid 15 min, one posting) → used; or rejected,
++ * cancelled by the requester, expired (no answer in 30 min), lapsed (approved but not used in 15 min).
++ */
++enum ApprovalStatus: string
++{
++    case Pending = 'pending';
++    case Approved = 'approved';
++    case Rejected = 'rejected';
++    case Cancelled = 'cancelled';
++    case Expired = 'expired';
++    case Used = 'used';
++    case Lapsed = 'lapsed';
++
++    public function label(): string
++    {
++        return match ($this) {
++            self::Pending => __('Ждёт ответа'),
++            self::Approved => __('Разрешено'),
++            self::Rejected => __('Отклонено'),
++            self::Cancelled => __('Отменена'),
++            self::Expired => __('Истекла'),
++            self::Used => __('Использовано'),
++            self::Lapsed => __('Разрешение сгорело'),
++        };
++    }
++
++    public function isFinal(): bool
++    {
++        return ! in_array($this, [self::Pending, self::Approved], true);
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Exceptions/ApprovalException.php b/prime-mobile-os/app/Domain/Approvals/Exceptions/ApprovalException.php
+new file mode 100644
+index 0000000..780d303
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Exceptions/ApprovalException.php
+@@ -0,0 +1,14 @@
++<?php
++
++namespace App\Domain\Approvals\Exceptions;
++
++use App\Support\Exceptions\UserFacingException;
++
++/**
++ * A request cannot be created / decided / cancelled for a business reason («У вас 3 заявки ждут ответа…»,
++ * «Заявка уже решена», «Подтвердите PIN…»). The message is for the person at the screen.
++ */
++class ApprovalException extends UserFacingException
++{
++    public string $reason = 'approval';
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Exceptions/ApprovalInvalidated.php b/prime-mobile-os/app/Domain/Approvals/Exceptions/ApprovalInvalidated.php
+new file mode 100644
+index 0000000..dd2e625
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Exceptions/ApprovalInvalidated.php
+@@ -0,0 +1,45 @@
++<?php
++
++namespace App\Domain\Approvals\Exceptions;
++
++use App\Domain\Tenancy\Access\AccessDecision;
++use App\Domain\Tenancy\Access\Exceptions\ApprovalRequired;
++
++/**
++ * There WAS an approval for this document, but it cannot be used: the operation changed after the answer
++ * (TZ 03 §6.5 p.1), the 15 minutes passed (§6.4), the posted value is above what was allowed («Разрешить с
++ * изменением»). It is an ApprovalRequired: the screen offers to send the request again, with this message.
++ */
++class ApprovalInvalidated extends ApprovalRequired
++{
++    public string $reason = 'approval_invalid';
++
++    public static function changed(AccessDecision $decision, string $type, bool $isSale): self
++    {
++        $message = match (true) {
++            $type === 'discount' => __('Заявка на скидку устарела: чек изменён после одобрения. Отправьте заявку снова'),
++            $isSale => __('Чек изменился после разрешения. Отправьте заявку снова'),
++            default => __('Документ изменился после разрешения. Отправьте заявку снова'),
++        };
++        $e = new self($decision, $type, $message);
++        $e->context['why'] = 'changed';
++
++        return $e;
++    }
++
++    public static function lapsed(AccessDecision $decision, string $type, int $minutes): self
++    {
++        $e = new self($decision, $type, __('Разрешение действовало :min минут и истекло. Отправьте заявку снова', ['min' => $minutes]));
++        $e->context['why'] = 'lapsed';
++
++        return $e;
++    }
++
++    public static function aboveApproved(AccessDecision $decision, string $type, string $what): self
++    {
++        $e = new self($decision, $type, __('Разрешено не больше: :what. Исправьте и проведите снова', ['what' => $what]));
++        $e->context['why'] = 'above_approved';
++
++        return $e;
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Fingerprint/DocumentFingerprints.php b/prime-mobile-os/app/Domain/Approvals/Fingerprint/DocumentFingerprints.php
+new file mode 100644
+index 0000000..da4d7c8
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Fingerprint/DocumentFingerprints.php
+@@ -0,0 +1,146 @@
++<?php
++
++namespace App\Domain\Approvals\Fingerprint;
++
++use App\Domain\Ledger\Enums\DocumentType;
++use App\Domain\Ledger\Models\Document;
++use App\Domain\Money\Models\Expense;
++use App\Domain\Money\Models\ExpensePayment;
++use App\Domain\Money\Models\MoneyAccount;
++use App\Domain\Sales\Models\CustomerReturn;
++use App\Domain\Sales\Models\CustomerReturnLine;
++use App\Domain\Sales\Models\CustomerReturnPayment;
++use App\Domain\Sales\Models\Sale;
++use App\Domain\Sales\Models\SaleLine;
++use App\Domain\Sales\Models\SalePayment;
++use Illuminate\Support\Facades\DB;
++
++/**
++ * Fingerprint of a draft document for approvals. Extractors per document type read only the INPUT of the draft
++ * (what the employee entered), never columns the handler computes during posting. Modules register their type:
++ *
++ *   app(DocumentFingerprints::class)->register(DocumentType::TradeIn, fn (Document $d) => [
++ *       'groups' => ['items' => [...], 'payments' => [...]],
++ *       'values' => ['buyout' => 15000000],
++ *   ]);
++ *
++ * A type without an extractor gets a generic one: the header (type, store, meta) + every row of every table with a
++ * document_id column (minus ids and timestamps). It is strict (any change invalidates), which is safe.
++ */
++class DocumentFingerprints
++{
++    /** @var array<string, callable(Document): array{groups: array, values?: array}> */
++    private array $extractors = [];
++
++    /** @var list<string>|null */
++    private static ?array $detailTables = null;
++
++    public function __construct()
++    {
++        $this->register(DocumentType::Sale, fn (Document $d) => $this->sale($d));
++        $this->register(DocumentType::CustomerReturn, fn (Document $d) => $this->customerReturn($d));
++        $this->register(DocumentType::Expense, fn (Document $d) => $this->expense($d));
++    }
++
++    /** @param callable(Document): array{groups: array, values?: array} $extractor */
++    public function register(DocumentType $type, callable $extractor): void
++    {
++        $this->extractors[$type->value] = $extractor;
++    }
++
++    public function of(Document $document): Fingerprint
++    {
++        $extractor = $this->extractors[$document->type->value] ?? fn (Document $d) => $this->generic($d);
++        $result = $extractor($document);
++
++        return Fingerprint::fromData($result['groups'], $result['values'] ?? []);
++    }
++
++    // ------------------------------------------------------------------ core types
++
++    private function sale(Document $d): array
++    {
++        $sale = Sale::query()->where('document_id', $d->id)->first();
++        $lines = SaleLine::query()->where('document_id', $d->id)->orderBy('line_no')->orderBy('id')->get();
++        $payments = SalePayment::query()->where('document_id', $d->id)->orderBy('method')->orderBy('amount')->orderBy('id')->get();
++        $discount = (int) $lines->sum('line_discount') + (int) ($sale?->check_discount ?? 0);
++        $debt = $payments->filter(fn ($p) => $p->method->value === 'debt');
++        $methods = $payments->map(fn ($p) => [$p->method->value, $p->account_id])->unique(fn ($m) => implode(':', $m))->sortBy(fn ($m) => implode(':', $m))->values()->all();
++
++        return [
++            'groups' => [
++                'party' => [$d->store_id, $sale?->seller_id, $sale?->customer_id, $sale?->order_document_id],
++                'items' => $lines->map(fn ($l) => [$l->stock_unit_id, $l->accessory_id, (int) $l->qty, (int) $l->price, (bool) $l->is_gift])->all(),
++                'discount' => [$lines->map(fn ($l) => (int) $l->line_discount)->all(), (int) ($sale?->check_discount ?? 0)],
++                'methods' => $methods,
++                'payments' => $payments->map(fn ($p) => [$p->method->value, $p->account_id, (int) $p->amount, $p->debt_due_date?->format('Y-m-d')])->all(),
++            ],
++            'values' => [
++                'discount' => $discount,
++                'debt' => (int) $debt->sum('amount'),
++                'debt_due' => $debt->map(fn ($p) => $p->debt_due_date?->format('Y-m-d'))->filter()->max(),
++                'total' => (int) $lines->sum(fn ($l) => $l->price * $l->qty) - $discount,
++            ],
++        ];
++    }
++
++    private function customerReturn(Document $d): array
++    {
++        $header = CustomerReturn::query()->where('document_id', $d->id)->first();
++        $lines = CustomerReturnLine::query()->where('document_id', $d->id)->orderBy('id')->get();
++        $refunds = CustomerReturnPayment::query()->where('document_id', $d->id)->orderBy('id')->get();
++
++        return [
++            'groups' => [
++                'party' => [$d->store_id, $header?->sale_document_id, $header?->customer_id],
++                'items' => $lines->map(fn ($l) => [$l->sale_line_id, (int) $l->qty, $l->amount === null ? null : (int) $l->amount, $l->unit_status_after])->all(),
++                'payments' => $refunds->map(fn ($r) => [$r->method, $r->account_id, (int) $r->amount])->all(),
++            ],
++            'values' => ['refund' => (int) $refunds->sum('amount')],
++        ];
++    }
++
++    private function expense(Document $d): array
++    {
++        $expense = Expense::query()->where('document_id', $d->id)->first();
++        $payments = ExpensePayment::query()->where('document_id', $d->id)->orderBy('id')->get();
++        $kzt = 0;
++        foreach ($payments as $p) {
++            $kzt += MoneyAccount::query()->whereKey($p->account_id)->value('currency') === 'KZT' ? (int) $p->amount : 0;
++        }
++
++        return [
++            'groups' => [
++                'party' => [$d->store_id, $expense?->article_id, $expense?->counterparty_type, $expense?->counterparty_id, $expense?->description],
++                'payments' => [$payments->map(fn ($p) => [$p->account_id, (int) $p->amount])->all(), (int) ($expense?->credit_amount ?? 0), $expense?->due_date],
++            ],
++            'values' => ['expense' => $kzt + (int) ($expense?->credit_amount ?? 0)],
++        ];
++    }
++
++    // ------------------------------------------------------------------ generic
++
++    private function generic(Document $d): array
++    {
++        $groups = ['header' => [$d->type->value, $d->store_id, $d->reversal_of_document_id, $d->meta]];
++        foreach (self::detailTables() as $table) {
++            $rows = DB::table($table)->where('document_id', $d->id)->orderBy('id')->get()
++                ->map(fn ($r) => array_diff_key((array) $r, array_flip(['id', 'organization_id', 'document_id', 'created_at', 'updated_at'])))
++                ->all();
++            if ($rows) {
++                $groups['t:'.$table] = $rows;
++            }
++        }
++
++        return ['groups' => $groups];
++    }
++
++    /** @return list<string> */
++    private static function detailTables(): array
++    {
++        return self::$detailTables ??= array_values(array_diff(
++            DB::table('information_schema.columns')->where('table_schema', 'public')->where('column_name', 'document_id')->pluck('table_name')->unique()->sort()->values()->all(),
++            ['inventory_movements', 'money_entries', 'debt_entries', 'bonus_entries', 'approval_requests', 'app_notifications', 'shifts', 'stock_units'],
++        ));
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Fingerprint/Fingerprint.php b/prime-mobile-os/app/Domain/Approvals/Fingerprint/Fingerprint.php
+new file mode 100644
+index 0000000..0a4fd97
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Fingerprint/Fingerprint.php
+@@ -0,0 +1,71 @@
++<?php
++
++namespace App\Domain\Approvals\Fingerprint;
++
++/**
++ * «Отпечаток» of an operation (TZ 03 §6.5 p.1): named groups of its data (items, party, discount, payments, …),
++ * each kept as a sha256, plus the amounts that a decider may change (values: discount, debt, debt_due, …).
++ * An approval is valid only while every group that was not released by «Разрешить с изменением» is the same.
++ */
++final class Fingerprint
++{
++    /**
++     * @param  array<string, string>  $groups  group => sha256
++     * @param  array<string, int|string|null>  $values
++     */
++    public function __construct(public readonly array $groups, public readonly array $values = []) {}
++
++    /** @param array<string, mixed> $data group => raw data */
++    public static function fromData(array $data, array $values = []): self
++    {
++        $groups = [];
++        foreach ($data as $name => $payload) {
++            $groups[$name] = hash('sha256', json_encode(self::normalize($payload), JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION));
++        }
++        ksort($groups);
++
++        return new self($groups, $values);
++    }
++
++    /** @param list<string> $released groups not compared @return list<string> differing groups */
++    public function differences(array $storedGroups, array $released = []): array
++    {
++        $diff = [];
++        foreach ($storedGroups as $name => $hash) {
++            if (in_array($name, $released, true)) {
++                continue;
++            }
++            if (($this->groups[$name] ?? null) !== $hash) {
++                $diff[] = $name;
++            }
++        }
++        foreach (array_keys($this->groups) as $name) {
++            if (! array_key_exists($name, $storedGroups) && ! in_array($name, $released, true)) {
++                $diff[] = $name;
++            }
++        }
++
++        return $diff;
++    }
++
++    private static function normalize(mixed $value): mixed
++    {
++        if (is_array($value)) {
++            return array_map(fn ($v) => self::normalize($v), $value);
++        }
++        if ($value instanceof \DateTimeInterface) {
++            return $value->format('Y-m-d\TH:i:sP');
++        }
++        if ($value instanceof \BackedEnum) {
++            return $value->value;
++        }
++        if (is_numeric($value) && ! is_string($value)) {
++            return $value + 0;
++        }
++        if (is_string($value) && preg_match('/^-?\d+$/', $value)) {
++            return (int) $value; // bigint columns may come back as strings
++        }
++
++        return $value;
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Models/ApprovalRequest.php b/prime-mobile-os/app/Domain/Approvals/Models/ApprovalRequest.php
+new file mode 100644
+index 0000000..ceb93d4
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Models/ApprovalRequest.php
+@@ -0,0 +1,156 @@
++<?php
++
++namespace App\Domain\Approvals\Models;
++
++use App\Domain\Approvals\ApprovalKinds;
++use App\Domain\Approvals\Enums\ApprovalStatus;
++use App\Domain\Ledger\Models\Document;
++use App\Domain\Tenancy\Models\Store;
++use App\Models\User;
++use App\Support\Tenancy\BelongsToOrganization;
++use Illuminate\Database\Eloquent\Builder;
++use Illuminate\Database\Eloquent\Model;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++use Illuminate\Support\Carbon;
++
++/**
++ * A request to the owner (TZ 03 §6). Written only by ApprovalService / DatabaseApprovalGate. The `sensitive` column
++ * (cost, profit) never leaves the server except through ApprovalPresenter::forViewer() for those who may see it.
++ *
++ * @property ApprovalStatus $status
++ * @property list<array{type: string, permission: string, limit: ?string, limit_value: ?int, actual_value: ?int, message: string}> $requirements
++ * @property array<string, string> $fingerprint
++ * @property array<string, int|string|null>|null $values
++ * @property Carbon $expires_at
++ * @property Carbon|null $valid_until
++ */
++class ApprovalRequest extends Model
++{
++    use BelongsToOrganization;
++
++    protected $guarded = ['*'];
++
++    protected $hidden = ['sensitive', 'fingerprint'];
++
++    protected function casts(): array
++    {
++        return [
++            'status' => ApprovalStatus::class,
++            'requirements' => 'array',
++            'fingerprint' => 'array',
++            'values' => 'array',
++            'context' => 'array',
++            'sensitive' => 'array',
++            'approved_values' => 'array',
++            'released_groups' => 'array',
++            'needs_confirmation' => 'boolean',
++            'max_value' => 'integer',
++            'decided_at' => 'datetime',
++            'expires_at' => 'datetime',
++            'valid_until' => 'datetime',
++            'reminded_at' => 'datetime',
++            'escalated_at' => 'datetime',
++            'used_at' => 'datetime',
++            'closed_at' => 'datetime',
++        ];
++    }
++
++    public function requester(): BelongsTo
++    {
++        return $this->belongsTo(User::class, 'requested_by');
++    }
++
++    public function decider(): BelongsTo
++    {
++        return $this->belongsTo(User::class, 'decided_by');
++    }
++
++    public function document(): BelongsTo
++    {
++        return $this->belongsTo(Document::class);
++    }
++
++    public function subjectDocument(): BelongsTo
++    {
++        return $this->belongsTo(Document::class, 'subject_document_id');
++    }
++
++    public function usedDocument(): BelongsTo
++    {
++        return $this->belongsTo(Document::class, 'used_document_id');
++    }
++
++    public function store(): BelongsTo
++    {
++        return $this->belongsTo(Store::class);
++    }
++
++    /** Pending and still alive (the tick may not have marked an old one yet). */
++    public function isPending(?\DateTimeInterface $now = null): bool
++    {
++        return $this->status === ApprovalStatus::Pending && $this->expires_at->greaterThan($now ?? now());
++    }
++
++    /** Approved, not used and within the 15 minutes. */
++    public function isUsable(?\DateTimeInterface $now = null): bool
++    {
++        return $this->status === ApprovalStatus::Approved && $this->valid_until !== null && $this->valid_until->greaterThan($now ?? now());
++    }
++
++    /** Effective status including the lazy expiry/lapse not yet written by the tick. */
++    public function effectiveStatus(?\DateTimeInterface $now = null): ApprovalStatus
++    {
++        $now ??= now();
++
++        return match (true) {
++            $this->status === ApprovalStatus::Pending && ! $this->expires_at->greaterThan($now) => ApprovalStatus::Expired,
++            $this->status === ApprovalStatus::Approved && ($this->valid_until === null || ! $this->valid_until->greaterThan($now)) => ApprovalStatus::Lapsed,
++            default => $this->status,
++        };
++    }
++
++    /** @return list<string> kinds of all requirements */
++    public function kinds(): array
++    {
++        return array_values(array_unique(array_map(fn ($r) => (string) $r['type'], $this->requirements ?? [])));
++    }
++
++    public function isOwnerOnly(): bool
++    {
++        foreach ($this->kinds() as $kind) {
++            if (ApprovalKinds::ownerOnly($kind)) {
++                return true;
++            }
++        }
++
++        return false;
++    }
++
++    /** Covers a check of ctx->authorize($permission, …, $type)? (any limit of that permission — L1/L2/L3 of a discount) */
++    public function covers(string $type, string $permission): bool
++    {
++        foreach ($this->requirements ?? [] as $r) {
++            if ($r['type'] === $type && $r['permission'] === $permission) {
++                return true;
++            }
++        }
++
++        return false;
++    }
++
++    /** @return list<string> value keys the decider may change for this request */
++    public function changeableKeys(): array
++    {
++        $keys = [];
++        foreach ($this->kinds() as $kind) {
++            $keys = array_merge($keys, ApprovalKinds::changeable($kind));
++        }
++
++        return array_values(array_unique(array_filter($keys, fn ($k) => array_key_exists($k, $this->values ?? []))));
++    }
++
++    public function scopeOpen(Builder $query): Builder
++    {
++        return $query->where('status', ApprovalStatus::Pending->value)->where('expires_at', '>', now());
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Services/ApprovalService.php b/prime-mobile-os/app/Domain/Approvals/Services/ApprovalService.php
+new file mode 100644
+index 0000000..da160d0
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Services/ApprovalService.php
+@@ -0,0 +1,552 @@
++<?php
++
++namespace App\Domain\Approvals\Services;
++
++use App\Domain\Approvals\ApprovalKinds;
++use App\Domain\Approvals\ApprovalSettings;
++use App\Domain\Approvals\Enums\ApprovalStatus;
++use App\Domain\Approvals\Exceptions\ApprovalException;
++use App\Domain\Approvals\Exceptions\ApprovalInvalidated;
++use App\Domain\Approvals\Fingerprint\DocumentFingerprints;
++use App\Domain\Approvals\Fingerprint\Fingerprint;
++use App\Domain\Approvals\Models\ApprovalRequest;
++use App\Domain\Ledger\Enums\DocumentStatus;
++use App\Domain\Ledger\Enums\ReversalReason;
++use App\Domain\Ledger\Models\Document;
++use App\Domain\Ledger\Posting\Poster;
++use App\Domain\Ledger\Posting\Reverser;
++use App\Domain\Notifications\Enums\NotificationType;
++use App\Domain\Notifications\Models\AppNotification;
++use App\Domain\Notifications\Services\Notifier;
++use App\Domain\Notifications\Services\Recipients;
++use App\Domain\Tenancy\Access\AccessChecker;
++use App\Domain\Tenancy\Access\AccessDecision;
++use App\Domain\Tenancy\Access\Exceptions\AccessDenied;
++use App\Models\User;
++use App\Support\Money\Money;
++use Carbon\CarbonImmutable;
++use Carbon\CarbonInterface;
++use Illuminate\Support\Facades\DB;
++
++/**
++ * Requests to the owner (TZ 03 §6, TZ 01 П9, TZ 04 Э28). Typical flow at the cash register:
++ *
++ *   try {
++ *       $sale = $poster->post($draft, $seller);
++ *   } catch (ApprovalRequired $e) {                          // «Скидка 15 000 ₸ больше вашего лимита 5 000 ₸»
++ *       $request = $approvals->requestForDocument($draft, $seller, $reasonText);   // one request, all requirements
++ *   }
++ *   // poll every 3 s: $queries->waitState($request, $seller) → «Ждём ответа Кайрата… 0:42» / «Разрешено…»
++ *   // after «Разрешено» (or «Применить» of a changed value to the SAME draft): $poster->post($draft, $seller)
++ *
++ * The owner: $queries->awaiting($owner), $presenter->forViewer($request, $owner), approve()/reject().
++ * Timings (reminder 3 min, admins 5 min, expiry 30 min, approval valid 15 min): tick() every minute.
++ */
++class ApprovalService
++{
++    public function __construct(
++        private readonly DatabaseApprovalGate $gate,
++        private readonly DocumentFingerprints $fingerprints,
++        private readonly ApprovalSummaries $summaries,
++        private readonly DeciderPolicy $policy,
++        private readonly AccessChecker $access,
++        private readonly Notifier $notifier,
++        private readonly Recipients $recipients,
++    ) {}
++
++    // ------------------------------------------------------------------ create
++
++    /** Request for a draft whose posting needs approval. Runs a preflight to gather ALL requirements of the draft. */
++    public function requestForDocument(Document $draft, User $requester, ?string $reasonText = null, ?string $reasonCode = null): ApprovalRequest
++    {
++        /** @var Document $draft */
++        $draft = Document::query()->whereKey($draft->id)->firstOrFail(); // another firm's document: not found
++        if (! $draft->isDraft()) {
++            throw ApprovalException::because('not_draft', __('Документ уже проведён — заявка не нужна'));
++        }
++        if ($draft->created_by !== null && (int) $draft->created_by !== $requester->id) {
++            throw AccessDenied::because('access_denied', __('Заявку по чужому черновику отправить нельзя'));
++        }
++        $this->assertMember($requester);
++        if ($draft->created_by === null) {
++            $draft->forceFill(['created_by' => $requester->id])->save();
++        }
++
++        $requirements = $this->gate->collect(fn () => app(Poster::class)->post($draft, $requester));
++        if ($requirements === []) {
++            throw ApprovalException::because('not_needed', __('Разрешение не нужно: документ можно провести'));
++        }
++        $described = $this->summaries->forDocument($draft, $requirements);
++        $request = $this->create($requester, $requirements, $this->fingerprints->of($draft), $described,
++            ['document_id' => $draft->id, 'store_id' => $draft->store_id], $reasonText, $reasonCode);
++        $draft->forceFill(['approval_request_id' => $request->id])->save();
++
++        return $request;
++    }
++
++    /** Request to reverse a posted document by someone whose role has «Сторно — заявкой» (TZ 03 №79, §6.1). */
++    public function requestReversal(Document $original, User $requester, ReversalReason|string $reason, ?string $reasonText = null): ApprovalRequest
++    {
++        /** @var Document $original */
++        $original = Document::query()->whereKey($original->id)->firstOrFail();
++        if ($original->status !== DocumentStatus::Posted) {
++            throw ApprovalException::because('not_posted', __('Сторнировать можно только проведённый документ'));
++        }
++        $this->assertMember($requester);
++        $reason = $reason instanceof ReversalReason ? $reason : ReversalReason::from($reason);
++
++        $requirements = $this->gate->collect(fn () => app(Reverser::class)->reverse($original, $reason, $reasonText, $requester));
++        if ($requirements === []) {
++            throw ApprovalException::because('not_needed', __('Разрешение не нужно: вы можете сторнировать документ сами'));
++        }
++        $described = $this->summaries->forReversal($original);
++        $fingerprint = Fingerprint::fromData(['subject' => [$original->id, $original->number]]);
++
++        return $this->create($requester, $requirements, $fingerprint, $described,
++            ['subject_document_id' => $original->id, 'store_id' => $original->store_id],
++            trim(($reason->value === 'other' ? '' : $this->reversalReasonLabel($reason).'. ').(string) $reasonText), $reason->value, forceReason: true);
++    }
++
++    /**
++     * Request for an action that is not a document (price change L14, customer export, staff dismissal, new device…).
++     * The module later calls useForAction() with the same payload before doing the action.
++     */
++    public function requestForAction(string $actionType, array $payload, User $requester, AccessDecision $decision, string $summary, ?int $storeId = null, ?string $reasonText = null, array $context = [], int $maxValue = 0): ApprovalRequest
++    {
++        $this->assertMember($requester);
++        $requirements = [[
++            'type' => $actionType, 'permission' => $decision->permission, 'limit' => $decision->limit?->value,
++            'limit_value' => $decision->limitValue, 'actual_value' => $decision->actualValue, 'message' => $decision->message,
++        ]];
++        $key = $this->actionKey($payload);
++
++        return $this->create($requester, $requirements, Fingerprint::fromData(['payload' => $payload]),
++            ['summary' => $summary, 'context' => $context, 'sensitive' => [], 'max_value' => $maxValue, 'decider_checks' => []],
++            ['action_type' => $actionType, 'action_key' => $key, 'store_id' => $storeId], $reasonText, null);
++    }
++
++    /** Consume the approval of a non-document action (one use, 15 min, same payload). */
++    public function useForAction(string $actionType, array $payload, User $actor): ApprovalRequest
++    {
++        return DB::transaction(function () use ($actionType, $payload, $actor) {
++            $request = ApprovalRequest::query()->where('action_type', $actionType)->where('action_key', $this->actionKey($payload))
++                ->where('requested_by', $actor->id)->where('status', ApprovalStatus::Approved->value)
++                ->orderByDesc('id')->lockForUpdate()->first();
++            $decision = AccessDecision::approval($actionType, null, null, null, __('Нужно разрешение владельца'));
++            if (! $request) {
++                throw new ApprovalInvalidated($decision, $actionType, __('Нет разрешения на это действие. Отправьте заявку владельцу'));
++            }
++            if (! $request->isUsable()) {
++                throw ApprovalInvalidated::lapsed($decision, $actionType, ApprovalSettings::minutes('valid_minutes'));
++            }
++            $request->forceFill(['status' => ApprovalStatus::Used->value, 'used_at' => now()])->save();
++            activity('approvals')->performedOn($request)->causedBy($actor)->log('used');
++
++            return $request;
++        });
++    }
++
++    // ------------------------------------------------------------------ decide
++
++    /**
++     * «Разрешить» or «Изменить и разрешить» (TZ 03 §6.3). $changes: ['discount' => Money|int tiyn],
++     * ['debt' => Money|int, 'debt_due' => 'Y-m-d'|Carbon] — only the values of the request's kinds, not above the asked.
++     * $confirmed: the PIN / Face ID of the decider was checked by the screen (requests above 300 000 ₸ except discounts).
++     */
++    public function approve(ApprovalRequest|int $request, User $decider, array $changes = [], ?string $comment = null, bool $confirmed = false): ApprovalRequest
++    {
++        return DB::transaction(function () use ($request, $decider, $changes, $comment, $confirmed) {
++            $r = $this->lockForDecision($request);
++            $changes = $this->normalizeChanges($r, $changes);
++            if ($why = $this->policy->whyNot($decider, $r, $changes)) {
++                throw AccessDenied::because('access_denied', $why);
++            }
++            if ($r->needs_confirmation && ! $confirmed) {
++                throw ApprovalException::because('confirmation_required', __('Заявка на :amount — подтвердите PIN, чтобы разрешить', ['amount' => Money::kztMinor((int) $r->max_value)->format()]));
++            }
++            $released = [];
++            foreach ($r->kinds() as $kind) {
++                if (array_intersect(ApprovalKinds::changeable($kind), array_keys($changes))) {
++                    $released = array_merge($released, ApprovalKinds::released($kind));
++                }
++            }
++            $now = CarbonImmutable::now();
++            $r->forceFill([
++                'status' => ApprovalStatus::Approved->value,
++                'decided_by' => $decider->id,
++                'decided_at' => $now,
++                'decision_comment' => $this->clean($comment),
++                'approved_values' => $changes ?: null,
++                'released_groups' => $released ? array_values(array_unique($released)) : null,
++                'valid_until' => $now->addMinutes(ApprovalSettings::minutes('valid_minutes')),
++            ])->save();
++            activity('approvals')->performedOn($r)->causedBy($decider)
++                ->withProperties(['kind' => $r->kind, 'changes' => $changes, 'comment' => $comment])->log($changes ? 'approved_with_change' : 'approved');
++
++            $this->afterDecision($r, $decider, $this->approvedText($r));
++
++            return $r;
++        });
++    }
++
++    /** «Отклонить» with an optional reason («Слишком большая скидка», «Позвони мне», «Нет»). */
++    public function reject(ApprovalRequest|int $request, User $decider, ?string $comment = null): ApprovalRequest
++    {
++        return DB::transaction(function () use ($request, $decider, $comment) {
++            $r = $this->lockForDecision($request);
++            if ($why = $this->policy->whyNot($decider, $r)) {
++                throw AccessDenied::because('access_denied', $why);
++            }
++            $r->forceFill([
++                'status' => ApprovalStatus::Rejected->value, 'decided_by' => $decider->id, 'decided_at' => now(),
++                'decision_comment' => $this->clean($comment), 'closed_at' => now(),
++            ])->save();
++            activity('approvals')->performedOn($r)->causedBy($decider)->withProperties(['kind' => $r->kind, 'comment' => $comment])->log('rejected');
++
++            $this->afterDecision($r, $decider, $this->rejectedText($r));
++
++            return $r;
++        });
++    }
++
++    /** «Отменить заявку» by the employee who sent it (pending, or approved and not used yet). */
++    public function cancel(ApprovalRequest|int $request, User $by): ApprovalRequest
++    {
++        return DB::transaction(function () use ($request, $by) {
++            /** @var ApprovalRequest $r */
++            $r = ApprovalRequest::query()->whereKey($request instanceof ApprovalRequest ? $request->id : $request)->lockForUpdate()->firstOrFail();
++            if ((int) $r->requested_by !== $by->id) {
++                throw AccessDenied::because('access_denied', __('Отменить заявку может только тот, кто её отправил'));
++            }
++            if (! in_array($r->status, [ApprovalStatus::Pending, ApprovalStatus::Approved], true)) {
++                throw ApprovalException::because('closed', __('Заявка уже закрыта: :status', ['status' => mb_strtolower($r->status->label())]));
++            }
++            $r->forceFill(['status' => ApprovalStatus::Cancelled->value, 'closed_at' => now()])->save();
++            activity('approvals')->performedOn($r)->causedBy($by)->log('cancelled');
++            $this->markRequestNotificationsRead($r);
++
++            return $r;
++        });
++    }
++
++    /**
++     * The register rebuilt the check as a NEW draft (e.g. after «Применить»): move the approval to it. The new draft
++     * must be the same operation (fingerprint, except groups released by the decider) of the same author.
++     */
++    public function rebind(ApprovalRequest|int $request, Document $newDraft, User $requester): ApprovalRequest
++    {
++        return DB::transaction(function () use ($request, $newDraft, $requester) {
++            /** @var ApprovalRequest $r */
++            $r = ApprovalRequest::query()->whereKey($request instanceof ApprovalRequest ? $request->id : $request)->lockForUpdate()->firstOrFail();
++            /** @var Document $doc */
++            $doc = Document::query()->whereKey($newDraft->id)->firstOrFail();
++            $old = $r->document_id ? Document::query()->find($r->document_id) : null;
++            if ((int) $r->requested_by !== $requester->id || ! $doc->isDraft() || ! $old || $old->type !== $doc->type
++                || ($doc->created_by !== null && (int) $doc->created_by !== $requester->id)) {
++                throw AccessDenied::because('access_denied', __('Перенести разрешение на этот документ нельзя'));
++            }
++            if (! in_array($r->status, [ApprovalStatus::Pending, ApprovalStatus::Approved], true)) {
++                throw ApprovalException::because('closed', __('Заявка уже закрыта: :status', ['status' => mb_strtolower($r->status->label())]));
++            }
++            if ($this->fingerprints->of($doc)->differences($r->fingerprint ?? [], $r->released_groups ?? []) !== []) {
++                throw ApprovalException::because('changed', __('Чек изменился после разрешения. Отправьте заявку снова'));
++            }
++            $old->isDraft() && $old->forceFill(['approval_request_id' => null])->save();
++            $r->forceFill(['document_id' => $doc->id])->save();
++            $doc->forceFill(['approval_request_id' => $r->id, 'created_by' => $requester->id])->save();
++
++            return $r;
++        });
++    }
++
++    // ------------------------------------------------------------------ timings
++
++    /**
++     * Every minute (scheduler, per organization): expiry after 30 min, lapse of unused approvals after 15 min,
++     * reminder after 3 min, escalation to admins after 5 min (TZ 03 §6.4).
++     *
++     * @return array{expired: int, lapsed: int, reminded: int, escalated: int}
++     */
++    public function tick(?CarbonInterface $now = null): array
++    {
++        $now = CarbonImmutable::instance($now ?? now());
++        $counts = ['expired' => 0, 'lapsed' => 0, 'reminded' => 0, 'escalated' => 0];
++
++        foreach (ApprovalRequest::query()->where('status', ApprovalStatus::Pending->value)->where('expires_at', '<=', $now)->orderBy('id')->pluck('id') as $id) {
++            DB::transaction(function () use ($id, $now, &$counts) {
++                $r = ApprovalRequest::query()->whereKey($id)->lockForUpdate()->first();
++                if ($r?->status !== ApprovalStatus::Pending) {
++                    return;
++                }
++                $r->forceFill(['status' => ApprovalStatus::Expired->value, 'closed_at' => $now])->save();
++                activity('approvals')->performedOn($r)->log('expired');
++                $this->markRequestNotificationsRead($r);
++                $this->notifier->toUser((int) $r->requested_by, NotificationType::ApprovalExpired,
++                    __('Заявка истекла: :what. Отправьте снова, если ещё нужно', ['what' => ApprovalKinds::label($r->kind)]), $r->summary,
++                    ['approval_request_id' => $r->id, 'document_id' => $r->document_id]);
++                $counts['expired']++;
++            });
++        }
++
++        foreach (ApprovalRequest::query()->where('status', ApprovalStatus::Approved->value)->where('valid_until', '<=', $now)->orderBy('id')->pluck('id') as $id) {
++            DB::transaction(function () use ($id, $now, &$counts) {
++                $r = ApprovalRequest::query()->whereKey($id)->lockForUpdate()->first();
++                if ($r?->status !== ApprovalStatus::Approved) {
++                    return;
++                }
++                $r->forceFill(['status' => ApprovalStatus::Lapsed->value, 'closed_at' => $now])->save();
++                activity('approvals')->performedOn($r)->log('lapsed');
++                $counts['lapsed']++;
++            });
++        }
++
++        $reminderAt = $now->subMinutes(ApprovalSettings::minutes('reminder_minutes'));
++        foreach (ApprovalRequest::query()->open()->whereNull('reminded_at')->where('created_at', '<=', $reminderAt)->orderBy('id')->get() as $r) {
++            $minutes = max(1, (int) floor($r->created_at->diffInMinutes($now)));
++            $this->notifier->toOwners(NotificationType::ApprovalReminder,
++                __(':name ждёт уже :min мин.: :what', ['name' => Recipients::firstName($r->requester), 'min' => $minutes, 'what' => ApprovalKinds::label($r->kind)]),
++                $r->summary, ['approval_request_id' => $r->id, 'headline' => $r->headline]);
++            $r->forceFill(['reminded_at' => $now])->save();
++            activity('approvals')->performedOn($r)->log('reminded');
++            $counts['reminded']++;
++        }
++
++        $escalateAt = $now->subMinutes(ApprovalSettings::minutes('escalate_minutes'));
++        foreach (ApprovalRequest::query()->open()->whereNull('escalated_at')->where('created_at', '<=', $escalateAt)->orderBy('id')->get() as $r) {
++            $deciders = collect();
++            if (ApprovalSettings::get('escalate_to_admins') && ! $r->isOwnerOnly()) {
++                $owners = $this->recipients->owners()->pluck('id')->all();
++                $deciders = $this->recipients->withPermission('approval.decide', $r->store_id)
++                    ->reject(fn (User $u) => in_array($u->id, $owners, true))
++                    ->filter(fn (User $u) => $this->policy->canDecide($u, $r));
++            }
++            $this->notifier->toUsers($deciders, NotificationType::ApprovalEscalated,
++                __('Заявка ждёт решения: :name — :what', ['name' => Recipients::firstName($r->requester), 'what' => ApprovalKinds::label($r->kind)]),
++                $r->summary, ['approval_request_id' => $r->id, 'headline' => $r->headline]);
++            $r->forceFill(['escalated_at' => $now])->save();
++            activity('approvals')->performedOn($r)->withProperties(['deciders' => $deciders->pluck('id')->all()])->log('escalated');
++            $counts['escalated']++;
++        }
++
++        return $counts;
++    }
++
++    // ------------------------------------------------------------------ texts
++
++    /** «Разрешено: скидка 15 000 ₸» / «Разрешено: скидка 10 000 ₸ (вы просили 15 000 ₸)» (TZ 03 §6.2 p.5, Э28.2). */
++    public function approvedText(ApprovalRequest $r): string
++    {
++        $changes = $r->approved_values ?? [];
++        if ($changes) {
++            $now = [];
++            $was = [];
++            foreach ($changes as $key => $value) {
++                $now[] = $this->valueText($key, $value);
++                $was[] = $this->valueText($key, $r->values[$key] ?? null, false);
++            }
++
++            return __('Разрешено: :now (вы просили :was)', ['now' => implode(', ', $now), 'was' => implode(', ', array_filter($was))]);
++        }
++        $main = $this->mainValueKey($r);
++
++        return $main ? __('Разрешено: :what', ['what' => $this->valueText($main, $r->values[$main] ?? null)])
++            : __('Разрешено: :what', ['what' => ApprovalKinds::label($r->kind)]);
++    }
++
++    public function rejectedText(ApprovalRequest $r): string
++    {
++        return $r->decision_comment ? __('Отклонено: «:reason»', ['reason' => $r->decision_comment]) : __('Отклонено');
++    }
++
++    private function valueText(string $key, mixed $value, bool $withTitle = true): string
++    {
++        if ($value === null) {
++            return '';
++        }
++        [$unit, $title] = ApprovalKinds::VALUE_KEYS[$key] ?? ['money', $key];
++        $text = $unit === 'date' ? CarbonImmutable::parse((string) $value)->format('d.m.Y') : Money::kztMinor((int) $value)->format();
++        if ($key === 'debt' && $withTitle) {
++            return __('долг до :amount', ['amount' => $text]);
++        }
++
++        return $withTitle ? __($title).' '.$text : $text;
++    }
++
++    private function mainValueKey(ApprovalRequest $r): ?string
++    {
++        foreach (ApprovalKinds::changeable($r->kind) as $key) {
++            if (isset($r->values[$key])) {
++                return $key;
++            }
++        }
++
++        return null;
++    }
++
++    // ------------------------------------------------------------------ internals
++
++    private function create(User $requester, array $requirements, Fingerprint $fingerprint, array $described, array $subject, ?string $reasonText, ?string $reasonCode, bool $forceReason = false): ApprovalRequest
++    {
++        return DB::transaction(function () use ($requester, $requirements, $fingerprint, $described, $subject, $reasonText, $reasonCode, $forceReason) {
++            $now = CarbonImmutable::now();
++            // serialize concurrent requests of one employee (double tap)
++            DB::table('memberships')->where('organization_id', $requester->getAttribute('organization_id') ?? DB::raw('organization_id'))->where('user_id', $requester->id)->lockForUpdate()->first();
++
++            $sameSubject = fn ($q) => isset($subject['document_id']) ? $q->where('document_id', $subject['document_id'])
++                : (isset($subject['subject_document_id']) ? $q->where('subject_document_id', $subject['subject_document_id'])
++                    : $q->where('action_type', $subject['action_type'])->where('action_key', $subject['action_key']));
++            // «Отправить снова»: a new request for the same operation supersedes the open one
++            ApprovalRequest::query()->where('requested_by', $requester->id)
++                ->whereIn('status', [ApprovalStatus::Pending->value, ApprovalStatus::Approved->value])
++                ->where($sameSubject)->lockForUpdate()->get()
++                ->each(function (ApprovalRequest $old) use ($now) {
++                    $old->forceFill(['status' => ApprovalStatus::Cancelled->value, 'closed_at' => $now])->save();
++                    activity('approvals')->performedOn($old)->log('superseded');
++                    $this->markRequestNotificationsRead($old);
++                });
++
++            $max = (int) ApprovalSettings::get('max_pending');
++            $open = ApprovalRequest::query()->where('requested_by', $requester->id)->open()->count();
++            if ($open >= $max) {
++                throw ApprovalException::because('too_many', __('У вас :n заявки ждут ответа. Дождитесь или отмените одну', ['n' => $open]));
++            }
++
++            $kind = ApprovalSummaries::mainKind($requirements);
++            $needsReason = $forceReason || collect($requirements)->contains(fn ($r) => ApprovalKinds::reasonRequired($r['type']));
++            $reasonText = $this->clean($reasonText);
++            if ($needsReason && mb_strlen((string) $reasonText) < 5) {
++                throw ApprovalException::because('reason_required', __('Напишите причину заявки (не короче 5 символов)'));
++            }
++            $values = $fingerprint->values;
++            if ($described['decider_checks'] ?? []) {
++                $values['decider_checks'] = $described['decider_checks'];
++            }
++            $confirmKinds = collect($requirements)->contains(fn ($r) => ApprovalKinds::countsForConfirmation($r['type']));
++
++            $request = new ApprovalRequest;
++            $request->forceFill($subject + [
++                'kind' => $kind,
++                'status' => ApprovalStatus::Pending->value,
++                'requested_by' => $requester->id,
++                'requirements' => $requirements,
++                'fingerprint' => $fingerprint->groups,
++                'values' => $values,
++                'headline' => ApprovalSummaries::headline($requester, $kind),
++                'summary' => $described['summary'],
++                'context' => $described['context'] ?: null,
++                'sensitive' => $described['sensitive'] ?: null,
++                'max_value' => (int) $described['max_value'],
++                'needs_confirmation' => $confirmKinds && (int) $described['max_value'] > ApprovalSettings::confirmThreshold(),
++                'reason_code' => $reasonCode,
++                'reason_text' => $reasonText,
++                'expires_at' => $now->addMinutes(ApprovalSettings::minutes('lifetime_minutes')),
++            ])->save();
++            activity('approvals')->performedOn($request)->causedBy($requester)
++                ->withProperties(['kind' => $kind, 'requirements' => array_column($requirements, 'type'), 'max_value' => $request->max_value])->log('created');
++
++            $this->notifier->toOwners(NotificationType::ApprovalNew, $request->headline, $request->summary,
++                ['approval_request_id' => $request->id, 'document_id' => $request->document_id, 'headline' => $request->headline]);
++
++            return $request;
++        });
++    }
++
++    private function lockForDecision(ApprovalRequest|int $request): ApprovalRequest
++    {
++        /** @var ApprovalRequest $r */
++        $r = ApprovalRequest::query()->whereKey($request instanceof ApprovalRequest ? $request->id : $request)->lockForUpdate()->firstOrFail();
++        $status = $r->effectiveStatus();
++        if ($status !== ApprovalStatus::Pending) {
++            throw ApprovalException::because('closed', match ($status) {
++                ApprovalStatus::Expired => __('Заявка истекла — сотрудник может отправить её снова'),
++                ApprovalStatus::Cancelled => __('Сотрудник отменил заявку'),
++                default => __('Заявка уже решена: :status', ['status' => mb_strtolower($status->label())]),
++            });
++        }
++
++        return $r;
++    }
++
++    /** @return array<string, int|string> */
++    private function normalizeChanges(ApprovalRequest $r, array $changes): array
++    {
++        $allowed = $r->changeableKeys();
++        $out = [];
++        foreach ($changes as $key => $value) {
++            if ($value === null || $value === '') {
++                continue;
++            }
++            if (! in_array($key, $allowed, true)) {
++                throw ApprovalException::because('change_not_allowed', __('Эту заявку можно только разрешить или отклонить'));
++            }
++            $unit = ApprovalKinds::VALUE_KEYS[$key][0] ?? 'money';
++            if ($unit === 'date') {
++                $date = $value instanceof CarbonInterface ? CarbonImmutable::instance($value) : CarbonImmutable::parse((string) $value);
++                if ($date->startOfDay()->lt(CarbonImmutable::now()->startOfDay()->addDay())) {
++                    throw ApprovalException::because('bad_change', __('Срок долга — не раньше завтрашнего дня'));
++                }
++                $out[$key] = $date->format('Y-m-d');
++
++                continue;
++            }
++            $minor = $value instanceof Money ? $value->amount : (int) $value;
++            $asked = (int) ($r->values[$key] ?? 0);
++            if ($minor <= 0 || $minor % Money::TENGE !== 0) {
++                throw ApprovalException::because('bad_change', __('Укажите сумму в целых тенге больше нуля'));
++            }
++            if ($minor > $asked) {
++                throw ApprovalException::because('bad_change', __('Можно разрешить не больше, чем просили: :amount', ['amount' => Money::kztMinor($asked)->format()]));
++            }
++            if ($minor !== $asked) {
++                $out[$key] = $minor;
++            }
++        }
++
++        return $out;
++    }
++
++    private function afterDecision(ApprovalRequest $r, User $decider, string $text): void
++    {
++        $this->markRequestNotificationsRead($r);
++        $this->notifier->toUser((int) $r->requested_by, NotificationType::ApprovalDecided, $text, $r->summary,
++            ['approval_request_id' => $r->id, 'document_id' => $r->document_id]);
++        if (! $this->access->isOwner($decider)) {
++            // TZ 03 §6.6 p.4: the owner learns about every decision of an admin — in the feed, without a push
++            $this->notifier->toOwners(NotificationType::ApprovalDecidedByOther,
++                __(':decider: :text (:name)', ['decider' => Recipients::firstName($decider), 'text' => $text, 'name' => Recipients::firstName($r->requester)]),
++                $r->summary, ['approval_request_id' => $r->id, 'silent' => true]);
++        }
++    }
++
++    /** The «new request / reminder / escalation» rows of a closed request are no longer actionable. */
++    private function markRequestNotificationsRead(ApprovalRequest $r): void
++    {
++        AppNotification::query()->where('approval_request_id', $r->id)->whereNull('read_at')
++            ->whereIn('type', [NotificationType::ApprovalNew->value, NotificationType::ApprovalReminder->value, NotificationType::ApprovalEscalated->value])
++            ->update(['read_at' => now(), 'updated_at' => now()]);
++    }
++
++    private function assertMember(User $user): void
++    {
++        if (! $this->recipients->isActiveMember($user)) {
++            throw AccessDenied::because('access_denied', __('Доступ закрыт. Обратитесь к владельцу'));
++        }
++    }
++
++    private function actionKey(array $payload): string
++    {
++        return hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE));
++    }
++
++    private function clean(?string $text): ?string
++    {
++        $text = trim((string) $text);
++
++        return $text === '' ? null : mb_substr($text, 0, 500);
++    }
++
++    private function reversalReasonLabel(ReversalReason $reason): string
++    {
++        return method_exists($reason, 'label') ? $reason->label() : $reason->value;
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Services/ApprovalSummaries.php b/prime-mobile-os/app/Domain/Approvals/Services/ApprovalSummaries.php
+new file mode 100644
+index 0000000..56d556a
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Services/ApprovalSummaries.php
+@@ -0,0 +1,303 @@
++<?php
++
++namespace App\Domain\Approvals\Services;
++
++use App\Domain\Approvals\ApprovalKinds;
++use App\Domain\Catalog\Models\Accessory;
++use App\Domain\Counterparties\Models\Customer;
++use App\Domain\Inventory\Models\AccessoryCost;
++use App\Domain\Inventory\Models\StockUnit;
++use App\Domain\Ledger\Enums\DocumentStatus;
++use App\Domain\Ledger\Enums\DocumentType;
++use App\Domain\Ledger\Models\CounterpartyBalance;
++use App\Domain\Ledger\Models\Document;
++use App\Domain\Money\Models\Expense;
++use App\Domain\Money\Models\ExpensePayment;
++use App\Domain\Money\Models\MoneyArticle;
++use App\Domain\Notifications\Services\Recipients;
++use App\Domain\Sales\Models\CustomerReturn;
++use App\Domain\Sales\Models\CustomerReturnLine;
++use App\Domain\Sales\Models\CustomerReturnPayment;
++use App\Domain\Sales\Models\Sale;
++use App\Domain\Sales\Models\SaleLine;
++use App\Domain\Sales\Models\SalePayment;
++use App\Domain\Sales\Services\ReturnCalculator;
++use App\Domain\Tenancy\Access\Limit;
++use App\Models\User;
++use App\Support\Money\Money;
++use App\Support\Tenancy\CurrentOrganization;
++use Carbon\CarbonImmutable;
++
++/**
++ * Texts of a request for the owner (TZ 03 §6.3, TZ 04 Э28.3): headline for the lock screen (no money),
++ * summary (what is asked — goes to push and Telegram, so no customer names / phones / IMEI), context for the card
++ * in the system (customer, seller's day), sensitive figures (cost, profit — shown only to those who may see them)
++ * and the money size of the request (PIN threshold, decider limits).
++ *
++ * Modules add their document types:
++ *   app(ApprovalSummaries::class)->register(DocumentType::TradeIn, fn (Document $d, array $requirements) => [...]);
++ */
++class ApprovalSummaries
++{
++    /** Display priority of the main kind of a request with several requirements. */
++    private const PRIORITY = ['below_cost', 'reversal', 'return', 'expense', 'debt_overdue', 'debt', 'discount', 'no_imei_check'];
++
++    /** @var array<string, callable(Document, array): array> */
++    private array $describers = [];
++
++    /** @param callable(Document, array $requirements): array{summary?: string, context?: array, sensitive?: array, max_value?: int} $describer */
++    public function register(DocumentType $type, callable $describer): void
++    {
++        $this->describers[$type->value] = $describer;
++    }
++
++    public static function mainKind(array $requirements): string
++    {
++        $kinds = array_map(fn ($r) => $r['type'], $requirements);
++        foreach (self::PRIORITY as $kind) {
++            if (in_array($kind, $kinds, true)) {
++                return $kind;
++            }
++        }
++
++        return $kinds[0] ?? 'other';
++    }
++
++    public static function headline(User $requester, string $kind): string
++    {
++        return __(':name просит разрешение: :what', ['name' => Recipients::firstName($requester), 'what' => ApprovalKinds::label($kind)]);
++    }
++
++    /** @return array{summary: string, context: array, sensitive: array, max_value: int} */
++    public function forDocument(Document $document, array $requirements): array
++    {
++        $result = match (true) {
++            isset($this->describers[$document->type->value]) => ($this->describers[$document->type->value])($document, $requirements),
++            $document->type === DocumentType::Sale => $this->sale($document, $requirements),
++            $document->type === DocumentType::CustomerReturn => $this->customerReturn($document),
++            $document->type === DocumentType::Expense => $this->expense($document),
++            default => [],
++        };
++
++        return [
++            'summary' => $result['summary'] ?? $this->fromRequirements($requirements),
++            'context' => $result['context'] ?? [],
++            'sensitive' => $result['sensitive'] ?? [],
++            'max_value' => (int) ($result['max_value'] ?? $this->maxFromRequirements($requirements)),
++            'decider_checks' => $result['decider_checks'] ?? [],
++        ];
++    }
++
++    /** @return array{summary: string, context: array, sensitive: array, max_value: int} */
++    public function forReversal(Document $original): array
++    {
++        $amount = match ($original->type) {
++            DocumentType::Sale => (int) Sale::query()->where('document_id', $original->id)->value('total'),
++            DocumentType::CustomerReturn => (int) CustomerReturn::query()->where('document_id', $original->id)->value('total'),
++            DocumentType::Expense => (int) Expense::query()->where('document_id', $original->id)->value('total_kzt'),
++            default => (int) abs((int) $original->moneyEntries()->where('amount_kzt', '<', 0)->sum('amount_kzt')),
++        };
++        $tz = CurrentOrganization::instance()->require()->timezone;
++
++        return [
++            'summary' => trim(__('Сторно: :title от :date', ['title' => $original->title(), 'date' => $original->occurred_at->setTimezone($tz)->format('d.m.Y')])
++                .($amount > 0 ? ' · '.Money::kztMinor($amount)->format() : '')),
++            'context' => ['document_id' => $original->id, 'number' => $original->number],
++            'sensitive' => [],
++            'max_value' => $amount,
++            // limit L18 of the decider (admin: 30 days) — the requester's «только заявкой» carries no limit
++            'decider_checks' => [['doc.reverse', 'L18', (int) abs($original->posted_at->setTimezone($tz)->startOfDay()->diffInDays(now()->setTimezone($tz)->startOfDay()))]],
++        ];
++    }
++
++    // ------------------------------------------------------------------ sale
++
++    private function sale(Document $d, array $requirements): array
++    {
++        $sale = Sale::query()->where('document_id', $d->id)->first();
++        $lines = SaleLine::query()->where('document_id', $d->id)->orderBy('line_no')->get();
++        $payments = SalePayment::query()->where('document_id', $d->id)->get();
++        $subtotal = (int) $lines->sum(fn ($l) => $l->price * $l->qty);
++        $discount = (int) $lines->sum('line_discount') + (int) ($sale?->check_discount ?? 0);
++        $total = $subtotal - $discount;
++        $debt = (int) $payments->filter(fn ($p) => $p->method->value === 'debt')->sum('amount');
++        $due = $payments->filter(fn ($p) => $p->method->value === 'debt')->map(fn ($p) => $p->debt_due_date)->filter()->max();
++        $items = $this->saleItems($lines);
++        $kinds = array_map(fn ($r) => $r['type'], $requirements);
++
++        $parts = [];
++        if (in_array('discount', $kinds, true)) {
++            $parts[] = __('Скидка :amount на :items (:from → :to)', [
++                'amount' => Money::kztMinor($discount)->format(), 'items' => $items,
++                'from' => Money::kztMinor($subtotal)->format(), 'to' => Money::kztMinor($total)->format(),
++            ]);
++        }
++        if (in_array('below_cost', $kinds, true)) {
++            $parts[] = __('Продажа ниже себестоимости: :items, итог :total', ['items' => $items, 'total' => Money::kztMinor($total)->format()]);
++        }
++        foreach (['debt', 'debt_overdue'] as $k) {
++            if (in_array($k, $kinds, true)) {
++                $after = collect($requirements)->first(fn ($r) => $r['type'] === $k && $r['limit'] === 'L4')['actual_value'] ?? null;
++                $parts[] = trim(__('Долг :debt до :due', ['debt' => Money::kztMinor($debt)->format(), 'due' => $due?->format('d.m.Y') ?? '—'])
++                    .($after !== null ? ' · '.__('общий долг клиента станет :after', ['after' => Money::kztMinor((int) $after)->format()]) : '')
++                    .($k === 'debt_overdue' ? ' · '.__('у клиента есть просроченный долг') : ''));
++                break;
++            }
++        }
++        if (in_array('no_imei_check', $kinds, true)) {
++            $parts[] = __('Продажа без отметки госбазы: :items', ['items' => $items]);
++        }
++        if (! $parts) {
++            $parts[] = $this->fromRequirements($requirements);
++        }
++
++        $cost = 0;
++        foreach ($lines as $l) {
++            $cost += $l->stock_unit_id
++                ? (int) StockUnit::query()->whereKey($l->stock_unit_id)->value('cost_kzt')
++                : (int) AccessoryCost::query()->where('accessory_id', $l->accessory_id)->value('avg_cost_kzt') * (int) $l->qty;
++        }
++        $profit = $total - $cost;
++
++        return [
++            'summary' => implode(' · ', $parts),
++            'context' => array_filter([
++                'check' => ['subtotal' => $subtotal, 'discount' => $discount, 'total' => $total, 'debt' => $debt],
++                'customer' => $sale?->customer_id ? $this->customerContext((int) $sale->customer_id) : null,
++                'seller_discounts_today' => $sale ? $this->sellerDiscountsToday((int) $sale->seller_id) : null,
++            ], fn ($v) => $v !== null),
++            'sensitive' => [
++                'cost' => $cost,
++                'profit' => $profit,
++                'margin_bp' => $total > 0 ? intdiv($profit * 10000, $total) : 0,  // basis points: 1090 = 10,90 %
++            ],
++            'max_value' => max(
++                in_array('discount', $kinds, true) ? $discount : 0,
++                array_intersect(['debt', 'debt_overdue'], $kinds) ? $debt : 0,
++                array_intersect(['below_cost', 'no_imei_check'], $kinds) ? $total : 0,
++            ),
++        ];
++    }
++
++    private function saleItems($lines): string
++    {
++        $out = [];
++        foreach ($lines as $l) {
++            if ($l->stock_unit_id) {
++                $unit = StockUnit::query()->with('variant')->find($l->stock_unit_id);
++                $out[] = trim(($unit?->variant?->title() ?? __('Телефон')).' ('.($unit?->public_code ?? '—').')');
++            } else {
++                $name = Accessory::query()->whereKey($l->accessory_id)->value('name_ru') ?? __('Аксессуар');
++                $out[] = $l->qty > 1 ? "{$name} × {$l->qty}" : $name;
++            }
++        }
++        if (count($out) > 3) {
++            return implode(', ', array_slice($out, 0, 3)).' '.__('и ещё :n', ['n' => count($out) - 3]);
++        }
++
++        return implode(', ', $out);
++    }
++
++    /** «Клиент Асхат, 3 покупки на 812 000 ₸, долгов нет» — in-app card only (TZ 03 §6.3). */
++    private function customerContext(int $customerId): array
++    {
++        $customer = Customer::query()->find($customerId);
++        $sales = Sale::query()->join('documents', 'documents.id', '=', 'sales.document_id')
++            ->where('documents.status', DocumentStatus::Posted->value)->where('sales.customer_id', $customerId);
++        $balance = CounterpartyBalance::query()->where('counterparty_type', 'customer')->where('counterparty_id', $customerId)->where('currency', 'KZT')->first();
++        $tz = CurrentOrganization::instance()->require()->timezone;
++
++        return [
++            'name' => $customer?->name,
++            'purchases' => (int) (clone $sales)->count(),
++            'purchases_total' => (int) (clone $sales)->sum('sales.total'),
++            'debt' => max(0, (int) ($balance?->balance ?? 0)),
++            'debt_overdue' => $balance && (int) $balance->balance > 0 && $balance->nearest_due_date
++                && CarbonImmutable::parse($balance->nearest_due_date, $tz)->lt(CarbonImmutable::now($tz)->startOfDay()),
++        ];
++    }
++
++    private function sellerDiscountsToday(int $sellerId): int
++    {
++        $tz = CurrentOrganization::instance()->require()->timezone;
++        $start = CarbonImmutable::now($tz)->startOfDay();
++
++        return (int) Sale::query()->join('documents', 'documents.id', '=', 'sales.document_id')
++            ->where('documents.status', DocumentStatus::Posted->value)
++            ->where('sales.seller_id', $sellerId)
++            ->where('documents.occurred_at', '>=', $start->utc())
++            ->sum('sales.discount_total');
++    }
++
++    // ------------------------------------------------------------------ return, expense
++
++    private function customerReturn(Document $d): array
++    {
++        $header = CustomerReturn::query()->where('document_id', $d->id)->first();
++        $lines = CustomerReturnLine::query()->where('document_id', $d->id)->get();
++        $refund = (int) CustomerReturnPayment::query()->where('document_id', $d->id)->sum('amount');
++        $saleDoc = $header ? Document::query()->find($header->sale_document_id) : null;
++        $saleLines = SaleLine::query()->whereIn('id', $lines->pluck('sale_line_id'))->get()->keyBy('id');
++        $items = $this->saleItems($lines->map(fn ($l) => tap(clone $saleLines[$l->sale_line_id], fn ($s) => $s->qty = $l->qty)));
++        $days = $saleDoc ? (int) abs($saleDoc->occurred_at->startOfDay()->diffInDays(now()->startOfDay())) : null;
++        $calculator = app(ReturnCalculator::class);
++        $phones = 0;
++        $accessories = 0;
++        foreach ($lines as $l) {
++            $amount = $calculator->lineAmount($saleLines[$l->sale_line_id], (int) $l->qty, $l->amount === null ? null : (int) $l->amount);
++            $saleLines[$l->sale_line_id]->stock_unit_id ? $phones += $amount : $accessories += $amount;
++        }
++        $checks = [];
++        if ($phones > 0) {
++            $checks[] = ['return.phone', 'L8', $phones];
++            $checks[] = ['return.phone', 'L9', (int) $days];
++        }
++        if ($accessories > 0 || $phones === 0) {
++            $checks[] = ['return.accessory', 'L7', $accessories];
++            $checks[] = ['return.accessory', 'L9', (int) $days];
++        }
++
++        return [
++            'summary' => __('Возврат :amount: :items по чеку :number, :days дн. после покупки', [
++                'amount' => Money::kztMinor($refund)->format(), 'items' => $items, 'number' => $saleDoc?->number ?? '—', 'days' => $days ?? '—',
++            ]),
++            'context' => ['sale_document_id' => $saleDoc?->id, 'days_since_sale' => $days],
++            'max_value' => max($refund, $phones + $accessories),
++            'decider_checks' => $checks,
++        ];
++    }
++
++    private function expense(Document $d): array
++    {
++        $expense = Expense::query()->where('document_id', $d->id)->first();
++        $amount = (int) ExpensePayment::query()->where('document_id', $d->id)->sum('amount') + (int) ($expense?->credit_amount ?? 0);
++        $article = $expense ? MoneyArticle::query()->whereKey($expense->article_id)->value('name_ru') : null;
++
++        return [
++            'summary' => __('Расход «:article» :amount', ['article' => $article ?? '—', 'amount' => Money::kztMinor($amount)->format()])
++                .($expense?->description ? ' · '.mb_substr((string) $expense->description, 0, 80) : ''),
++            'max_value' => $amount,
++        ];
++    }
++
++    // ------------------------------------------------------------------ generic
++
++    private function fromRequirements(array $requirements): string
++    {
++        $messages = array_values(array_unique(array_filter(array_map(fn ($r) => $r['message'] ?? '', $requirements))));
++
++        return $messages ? implode(' · ', $messages) : __('Нужно разрешение владельца');
++    }
++
++    private function maxFromRequirements(array $requirements): int
++    {
++        $max = 0;
++        foreach ($requirements as $r) {
++            if ($r['limit'] && Limit::from($r['limit'])->unit() === 'money') {
++                $max = max($max, (int) $r['actual_value']);
++            }
++        }
++
++        return $max;
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Services/DatabaseApprovalGate.php b/prime-mobile-os/app/Domain/Approvals/Services/DatabaseApprovalGate.php
+new file mode 100644
+index 0000000..7c4e6bd
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Services/DatabaseApprovalGate.php
+@@ -0,0 +1,175 @@
++<?php
++
++namespace App\Domain\Approvals\Services;
++
++use App\Domain\Approvals\ApprovalKinds;
++use App\Domain\Approvals\Enums\ApprovalStatus;
++use App\Domain\Approvals\Exceptions\ApprovalInvalidated;
++use App\Domain\Approvals\Fingerprint\DocumentFingerprints;
++use App\Domain\Approvals\Models\ApprovalRequest;
++use App\Domain\Ledger\Enums\DocumentType;
++use App\Domain\Ledger\Models\Document;
++use App\Domain\Ledger\Posting\ApprovalGate;
++use App\Domain\Tenancy\Access\AccessDecision;
++use App\Support\Money\Money;
++use Carbon\CarbonImmutable;
++use Illuminate\Support\Facades\DB;
++use LogicException;
++
++/**
++ * The Approvals implementation of the core ApprovalGate (TZ 03 §6.4–6.5), bound instead of NoApprovals.
++ *
++ * Called by PostingContext::authorize() inside the posting transaction when a limit is exceeded:
++ *  1. finds the request of THIS document (documents.approval_request_id, or for a reversal the request about the
++ *     original document) made by the author of the draft; a request of another document / firm is ignored;
++ *  2. it must be approved, not older than 15 minutes, not used by another posting (one approval = one posting);
++ *  3. it must cover this type + permission (any limit of it: L1/L2/L3 of a discount);
++ *  4. the fingerprint of the document must be the same, except groups released by «Разрешить с изменением»,
++ *     whose values must not exceed what was allowed («разрешение на 5 000 ₸ не годится на 9 000 ₸»);
++ *  5. marks the request used by this document (rolled back with the posting if it fails) and sets
++ *     documents.approval_request_id (the Poster keeps it: the approved check does not spend daily limits).
++ *
++ * collect() — «preflight»: runs an operation (Poster::post / Reverser::reverse) in a transaction that is always rolled
++ * back, answering «approved» to every check and recording what would need an approval. This gives ONE request with
++ * all requirements of a check (discount + debt) instead of a chain of requests.
++ */
++class DatabaseApprovalGate implements ApprovalGate
++{
++    /** @var array<string, array>|null collect mode when not null */
++    private ?array $collected = null;
++
++    public function __construct(private readonly DocumentFingerprints $fingerprints) {}
++
++    public function isApproved(Document $document, string $approvalType, AccessDecision $decision): bool
++    {
++        if ($this->collected !== null) {
++            $this->record($approvalType, $decision);
++
++            return true;
++        }
++
++        return $this->check($document, $approvalType, $decision);
++    }
++
++    /**
++     * @return list<array{type: string, permission: string, limit: ?string, limit_value: ?int, actual_value: ?int, message: string}>
++     */
++    public function collect(callable $operation): array
++    {
++        if ($this->collected !== null) {
++            throw new LogicException('Approval preflight cannot be nested.');
++        }
++        $this->collected = [];
++        try {
++            DB::transaction(function () use ($operation) {
++                $operation();
++                throw new PreflightRollback;
++            });
++        } catch (PreflightRollback) {
++            // expected: nothing of the preflight stays in the database
++        } finally {
++            $requirements = array_values($this->collected ?? []);
++            $this->collected = null;
++        }
++
++        return $requirements;
++    }
++
++    public function isCollecting(): bool
++    {
++        return $this->collected !== null;
++    }
++
++    private function record(string $type, AccessDecision $decision): void
++    {
++        // «только заявкой» decisions carry no limit: keep each checked value (amount, days) as its own requirement
++        $key = $type.'|'.$decision->permission.'|'.($decision->limit?->value ?? '-:'.$decision->actualValue);
++        $row = [
++            'type' => $type,
++            'permission' => $decision->permission,
++            'limit' => $decision->limit?->value,
++            'limit_value' => $decision->limitValue,
++            'actual_value' => $decision->actualValue,
++            'message' => $decision->message,
++        ];
++        if (! isset($this->collected[$key]) || (int) $row['actual_value'] > (int) $this->collected[$key]['actual_value']) {
++            $this->collected[$key] = $row;
++        }
++    }
++
++    private function check(Document $document, string $type, AccessDecision $decision): bool
++    {
++        $request = $this->resolve($document);
++        if (! $request) {
++            return false;
++        }
++        /** @var ApprovalRequest $request */
++        $request = ApprovalRequest::query()->whereKey($request->id)->lockForUpdate()->first();
++        $usedHere = $request->status === ApprovalStatus::Used && (int) $request->used_document_id === (int) $document->id;
++        if ($request->status !== ApprovalStatus::Approved && ! $usedHere) {
++            return false; // pending / rejected / expired / used elsewhere → the document needs (a new) request
++        }
++        if (! $request->covers($type, $decision->permission)) {
++            return false;
++        }
++        $now = CarbonImmutable::now();
++        if (! $usedHere && ($request->valid_until === null || $request->valid_until->lessThanOrEqualTo($now))) {
++            throw ApprovalInvalidated::lapsed($decision, $type, (int) round($request->decided_at?->diffInMinutes($request->valid_until) ?? 15));
++        }
++        $this->assertSameOperation($document, $request, $decision, $type);
++
++        if (! $usedHere) {
++            $request->forceFill(['status' => ApprovalStatus::Used->value, 'used_document_id' => $document->id, 'used_at' => $now])->save();
++            activity('approvals')->performedOn($request)->withProperties(['document_id' => $document->id, 'kind' => $request->kind])->log('used');
++        }
++        $document->approval_request_id = $request->id;
++
++        return true;
++    }
++
++    private function resolve(Document $document): ?ApprovalRequest
++    {
++        if ($document->type === DocumentType::Reversal) {
++            return ApprovalRequest::query()
++                ->where('subject_document_id', $document->reversal_of_document_id)
++                ->when($document->created_by, fn ($q) => $q->where('requested_by', $document->created_by))
++                ->whereIn('status', [ApprovalStatus::Approved->value, ApprovalStatus::Used->value])
++                ->where(fn ($q) => $q->whereNull('used_document_id')->orWhere('used_document_id', $document->id))
++                ->orderByDesc('id')->first();
++        }
++        $query = ApprovalRequest::query()->where('document_id', $document->id)
++            ->when($document->created_by, fn ($q) => $q->where('requested_by', $document->created_by));
++        if ($document->approval_request_id) {
++            // an id that belongs to another document (or firm: global scope) authorizes nothing
++            return $query->whereKey($document->approval_request_id)->first();
++        }
++
++        return $query->whereIn('status', [ApprovalStatus::Approved->value, ApprovalStatus::Used->value])->orderByDesc('id')->first();
++    }
++
++    private function assertSameOperation(Document $document, ApprovalRequest $request, AccessDecision $decision, string $type): void
++    {
++        if ($document->type === DocumentType::Reversal) {
++            return; // bound to the original document by subject_document_id
++        }
++        $current = $this->fingerprints->of($document);
++        $released = $request->released_groups ?? [];
++        if ($current->differences($request->fingerprint ?? [], $released) !== []) {
++            throw ApprovalInvalidated::changed($decision, $type, $document->type === DocumentType::Sale);
++        }
++        foreach ($request->approved_values ?? [] as $key => $allowed) {
++            $value = $current->values[$key] ?? null;
++            if ($allowed === null || $value === null) {
++                continue;
++            }
++            $unit = ApprovalKinds::VALUE_KEYS[$key][0] ?? 'money';
++            $over = $unit === 'date' ? (string) $value > (string) $allowed : (int) $value > (int) $allowed;
++            if ($over) {
++                $what = __(ApprovalKinds::VALUE_KEYS[$key][1] ?? $key).' '.($unit === 'date'
++                    ? CarbonImmutable::parse((string) $allowed)->format('d.m.Y')
++                    : Money::kztMinor((int) $allowed)->format());
++                throw ApprovalInvalidated::aboveApproved($decision, $type, $what);
++            }
++        }
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Services/DeciderPolicy.php b/prime-mobile-os/app/Domain/Approvals/Services/DeciderPolicy.php
+new file mode 100644
+index 0000000..797587d
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Services/DeciderPolicy.php
+@@ -0,0 +1,93 @@
++<?php
++
++namespace App\Domain\Approvals\Services;
++
++use App\Domain\Approvals\ApprovalSettings;
++use App\Domain\Approvals\Models\ApprovalRequest;
++use App\Domain\Tenancy\Access\AccessChecker;
++use App\Domain\Tenancy\Access\Limit;
++use App\Models\User;
++use Carbon\CarbonImmutable;
++
++/**
++ * Who may answer a request (TZ 03 §6.5 p.4, §6.6, TZ 04 Э25.3):
++ *  - never the requester himself; only an active member with approval.decide;
++ *  - the owner — always;
++ *  - anyone else (admin) — only after 5 minutes without an answer (if «через 5 минут — и Админ» is on), never for
++ *    owner-only types (below cost, export, dismissal, integrator, new device), and only if EVERY requirement fits
++ *    the decider's OWN limits (admin with a 30 000 ₸ discount limit may allow 15 000 ₸, not 40 000 ₸ — such a
++ *    request is not even shown to him).
++ */
++class DeciderPolicy
++{
++    public function __construct(private readonly AccessChecker $access) {}
++
++    public function canDecide(User $decider, ApprovalRequest $request, array $changes = []): bool
++    {
++        return $this->whyNot($decider, $request, $changes) === null;
++    }
++
++    /** null = may decide; otherwise the reason for the screen. */
++    public function whyNot(User $decider, ApprovalRequest $request, array $changes = [], ?CarbonImmutable $now = null): ?string
++    {
++        $now ??= CarbonImmutable::now();
++        if ((int) $request->requested_by === $decider->id) {
++            return __('Свою заявку решить нельзя');
++        }
++        $right = $this->access->decide($decider, 'approval.decide', storeId: $request->store_id);
++        if ($right->isDenied()) {
++            return $right->message ?: __('Нет права решать заявки');
++        }
++        if ($this->access->isOwner($decider)) {
++            return null;
++        }
++        if ($request->isOwnerOnly()) {
++            return __('Эту заявку решает только владелец');
++        }
++        if (! ApprovalSettings::get('escalate_to_admins')) {
++            return __('Заявки решает только владелец');
++        }
++        if ($request->created_at->copy()->addMinutes(ApprovalSettings::minutes('escalate_minutes'))->greaterThan($now)) {
++            return __('Заявка ещё у владельца: если он не ответит за :min минут, её сможете решить вы', ['min' => ApprovalSettings::minutes('escalate_minutes')]);
++        }
++        foreach ($request->requirements ?? [] as $req) {
++            $limit = $req['limit'] ? Limit::from($req['limit']) : null;
++            $value = $this->valueFor($req, $request, $changes);
++            $decision = $this->access->decide($decider, $req['permission'], $limit, $limit ? $value : null, $request->store_id);
++            if (! $decision->isAllowed()) {
++                return __('Сумма больше вашего лимита — заявку решает владелец');
++            }
++        }
++        // «только заявкой» for the requester carries no limit: the limits that matter for the decider are given by
++        // the document (return: amount + days, reversal: days) — values.decider_checks
++        foreach ($request->values['decider_checks'] ?? [] as [$permission, $limitCode, $value]) {
++            $decision = $this->access->decide($decider, $permission, Limit::from($limitCode), (int) $value, $request->store_id);
++            if (! $decision->isAllowed()) {
++                return __('Сумма больше вашего лимита — заявку решает владелец');
++            }
++        }
++
++        return null;
++    }
++
++    /** The value checked against the decider's own limit (day limits: this operation only). */
++    private function valueFor(array $req, ApprovalRequest $request, array $changes): ?int
++    {
++        $values = $request->values ?? [];
++        $actual = $req['actual_value'] === null ? null : (int) $req['actual_value'];
++        $discount = isset($changes['discount']) ? (int) $changes['discount'] : ($values['discount'] ?? null);
++
++        return match ($req['limit']) {
++            'L1', 'L3' => $discount !== null ? (int) $discount : $actual,
++            'L2' => ($actual !== null && isset($changes['discount']) && ($values['discount'] ?? 0) > 0)
++                ? intdiv($actual * (int) $changes['discount'] + (int) $values['discount'] - 1, (int) $values['discount'])
++                : $actual,
++            'L4' => ($actual !== null && isset($changes['debt'])) ? $actual - ((int) ($values['debt'] ?? 0) - (int) $changes['debt']) : $actual,
++            'L5' => isset($changes['debt_due'])
++                ? (int) abs(CarbonImmutable::now()->startOfDay()->diffInDays(CarbonImmutable::parse((string) $changes['debt_due'])->startOfDay()))
++                : $actual,
++            'L11' => isset($values['expense']) ? (int) $values['expense'] : $actual,
++            default => $actual,
++        };
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Approvals/Services/PreflightRollback.php b/prime-mobile-os/app/Domain/Approvals/Services/PreflightRollback.php
+new file mode 100644
+index 0000000..cbd300b
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Approvals/Services/PreflightRollback.php
+@@ -0,0 +1,8 @@
++<?php
++
++namespace App\Domain\Approvals\Services;
++
++use RuntimeException;
++
++/** @internal thrown to roll back the approval preflight (DatabaseApprovalGate::collect()) */
++final class PreflightRollback extends RuntimeException {}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Channels/NullPushSender.php b/prime-mobile-os/app/Domain/Notifications/Channels/NullPushSender.php
+new file mode 100644
+index 0000000..3bf8657
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Channels/NullPushSender.php
+@@ -0,0 +1,20 @@
++<?php
++
++namespace App\Domain\Notifications\Channels;
++
++use App\Domain\Notifications\Models\AppNotification;
++use App\Models\User;
++
++/** Default PushSender until the PWA module provides Web Push: nothing is sent, the bell still has the notification. */
++final class NullPushSender implements PushSender
++{
++    public function isConfigured(): bool
++    {
++        return false;
++    }
++
++    public function send(User $user, AppNotification $notification): bool
++    {
++        return false;
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Channels/PushSender.php b/prime-mobile-os/app/Domain/Notifications/Channels/PushSender.php
+new file mode 100644
+index 0000000..b8e33f5
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Channels/PushSender.php
+@@ -0,0 +1,23 @@
++<?php
++
++namespace App\Domain\Notifications\Channels;
++
++use App\Domain\Notifications\Models\AppNotification;
++use App\Models\User;
++
++/**
++ * Web Push (PWA) channel — interface only in this round (TZ 03 §18 p.9: pushes on iPhone work only for the app added
++ * to the Home screen). The PWA module binds its implementation (VAPID keys, subscriptions) in its provider:
++ *
++ *   $this->app->singleton(PushSender::class, WebPushSender::class);
++ *
++ * The lock-screen text is $notification->data['headline'] when present (no money, no names of customers —
++ * TZ 03 §6.3), otherwise the title.
++ */
++interface PushSender
++{
++    public function isConfigured(): bool;
++
++    /** @return bool delivered to at least one device of the user */
++    public function send(User $user, AppNotification $notification): bool;
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Channels/TelegramChannel.php b/prime-mobile-os/app/Domain/Notifications/Channels/TelegramChannel.php
+new file mode 100644
+index 0000000..4e79bf8
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Channels/TelegramChannel.php
+@@ -0,0 +1,66 @@
++<?php
++
++namespace App\Domain\Notifications\Channels;
++
++use Illuminate\Support\Facades\Http;
++use Illuminate\Support\Facades\Log;
++use Throwable;
++
++/**
++ * Telegram Bot API (sendMessage). Off unless TELEGRAM_BOT_TOKEN is set in .env (config services.telegram.bot_token);
++ * the token is never stored in the database or logged. Telegram is a service outside Kazakhstan, so only the firm's
++ * figures go there (TZ 06 §4.2 p.1): sanitize() removes phone numbers, IMEI and IIN as a last line of defence.
++ */
++class TelegramChannel
++{
++    public const API = 'https://api.telegram.org';
++
++    public function isEnabled(): bool
++    {
++        return trim((string) config('services.telegram.bot_token')) !== '';
++    }
++
++    public function botUsername(): ?string
++    {
++        $name = trim((string) config('services.telegram.bot_username'));
++
++        return $name === '' ? null : ltrim($name, '@');
++    }
++
++    /** @return bool true when Telegram accepted the message */
++    public function send(string $chatId, string $text): bool
++    {
++        if (! $this->isEnabled()) {
++            return false;
++        }
++        try {
++            $response = Http::timeout(5)->connectTimeout(3)->asJson()
++                ->post(self::API.'/bot'.config('services.telegram.bot_token').'/sendMessage', [
++                    'chat_id' => $chatId,
++                    'text' => mb_substr(self::sanitize($text), 0, 4000),
++                    'disable_web_page_preview' => true,
++                ]);
++        } catch (Throwable $e) {
++            Log::warning('telegram: send failed', ['error' => $e::class]);
++
++            return false;
++        }
++        if (! $response->successful() || $response->json('ok') !== true) {
++            Log::warning('telegram: rejected', ['status' => $response->status(), 'description' => $response->json('description')]);
++
++            return false;
++        }
++
++        return true;
++    }
++
++    /** Strip personal data: +7 phone numbers, 15-digit IMEI, 12-digit IIN (TZ 06 §4.2 p.1, TZ 00-kazakhstan п. 2). */
++    public static function sanitize(string $text): string
++    {
++        $text = preg_replace('/\+?[78][\s\-()]*\d{3}[\s\-()]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2}/u', '•••', $text) ?? $text;
++        $text = preg_replace('/(?<!\d)(?:\d[\s]?){14}\d(?!\d)/u', '•••', $text) ?? $text;   // IMEI (also «35 693812 4471 206»)
++        $text = preg_replace('/(?<!\d)\d{12}(?!\d)/u', '•••', $text) ?? $text;               // IIN / BIN
++
++        return $text;
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Enums/NotificationType.php b/prime-mobile-os/app/Domain/Notifications/Enums/NotificationType.php
+new file mode 100644
+index 0000000..7e59a19
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Enums/NotificationType.php
+@@ -0,0 +1,124 @@
++<?php
++
++namespace App\Domain\Notifications\Enums;
++
++/**
++ * Notification types of TZ 04 Э28.1 and TZ 06 §4.3 («мгновенные события владельцу»), plus the approval lifecycle
++ * (TZ 03 §6). Each type has default channels; a user overrides them in notification_preferences
++ * (Э26 «Уведомления»: «событие × (пуш / Telegram)»). In-app (the bell) is always on.
++ */
++enum NotificationType: string
++{
++    // approvals (TZ 03 §6.3–6.6)
++    case ApprovalNew = 'approval_new';
++    case ApprovalReminder = 'approval_reminder';
++    case ApprovalEscalated = 'approval_escalated';
++    case ApprovalDecided = 'approval_decided';
++    case ApprovalDecidedByOther = 'approval_decided_by_other';
++    case ApprovalExpired = 'approval_expired';
++    // instant owner events (TZ 06 §4.3)
++    case BelowCostSale = 'below_cost_sale';
++    case DocumentReversed = 'document_reversed';
++    case BigDiscount = 'big_discount';
++    case ShiftDiscrepancy = 'shift_discrepancy';
++    case CashNotClosed = 'cash_not_closed';
++    case CustomerReturn = 'customer_return';
++    case CustomerExport = 'customer_export';
++    case NewDevice = 'new_device';
++    case StorefrontMismatch = 'storefront_mismatch';
++    case ReconciliationFailed = 'reconciliation_failed';
++    // bell (TZ 04 Э28.1)
++    case CollectionPending = 'collection_pending';
++    case TransferIncoming = 'transfer_incoming';
++    case DebtDue = 'debt_due';
++    case SupplierDue = 'supplier_due';
++    case OrderOverdue = 'order_overdue';
++    case ImeiBlocked = 'imei_blocked';
++    case WarrantyDue = 'warranty_due';
++    case DailySummary = 'daily_summary';
++    case System = 'system';
++
++    public function label(): string
++    {
++        return match ($this) {
++            self::ApprovalNew => __('Новая заявка'),
++            self::ApprovalReminder => __('Напоминание о заявке'),
++            self::ApprovalEscalated => __('Заявка ждёт решения (передана админу)'),
++            self::ApprovalDecided => __('Ответ на мою заявку'),
++            self::ApprovalDecidedByOther => __('Решение админа по заявке'),
++            self::ApprovalExpired => __('Заявка истекла'),
++            self::BelowCostSale => __('Продажа ниже себестоимости проведена'),
++            self::DocumentReversed => __('Сторно документа'),
++            self::BigDiscount => __('Большая скидка в чеке'),
++            self::ShiftDiscrepancy => __('Расхождение кассы'),
++            self::CashNotClosed => __('Касса не закрыта'),
++            self::CustomerReturn => __('Возврат покупателю проведён'),
++            self::CustomerExport => __('Выгрузка клиентов в Excel'),
++            self::NewDevice => __('Вход с нового устройства'),
++            self::StorefrontMismatch => __('Сайт и склад разошлись'),
++            self::ReconciliationFailed => __('Ночная проверка не сошлась'),
++            self::CollectionPending => __('Инкассация ждёт приёма'),
++            self::TransferIncoming => __('Входящее перемещение'),
++            self::DebtDue => __('Срок долга клиента'),
++            self::SupplierDue => __('Срок оплаты поставщику'),
++            self::OrderOverdue => __('Заказ просрочен'),
++            self::ImeiBlocked => __('Телефон заблокирован в госбазе'),
++            self::WarrantyDue => __('Гарантийное обращение: срок'),
++            self::DailySummary => __('Сводка дня'),
++            self::System => __('Системное сообщение'),
++        };
++    }
++
++    /** Default: push to the phone (PWA). Feed-only types never push (TZ 03 §6.6 p.4). */
++    public function defaultPush(): bool
++    {
++        return ! in_array($this, [
++            self::ApprovalDecidedByOther, self::ApprovalExpired, self::TransferIncoming, self::DebtDue,
++            self::SupplierDue, self::WarrantyDue, self::System,
++        ], true);
++    }
++
++    /** Default: the Telegram copy (TZ 01 П9 p.2, TZ 06 §4.1) — only for what the owner must not miss. */
++    public function defaultTelegram(): bool
++    {
++        return in_array($this, [
++            self::ApprovalNew, self::ApprovalReminder, self::ShiftDiscrepancy, self::CashNotClosed,
++            self::ReconciliationFailed, self::DailySummary,
++        ], true);
++    }
++
++    /** Types shown in the owner settings table «что присылать» (Э26 «Уведомления»). */
++    public static function ownerConfigurable(): array
++    {
++        return [
++            self::ApprovalNew, self::ApprovalReminder, self::BelowCostSale, self::DocumentReversed, self::BigDiscount,
++            self::ShiftDiscrepancy, self::CashNotClosed, self::CustomerReturn, self::CustomerExport, self::NewDevice,
++            self::StorefrontMismatch, self::ReconciliationFailed, self::CollectionPending, self::OrderOverdue,
++            self::ImeiBlocked, self::DailySummary,
++        ];
++    }
++
++    /** Lucide icon name for the bell (UI modules). */
++    public function icon(): string
++    {
++        return match ($this) {
++            self::ApprovalNew, self::ApprovalReminder, self::ApprovalEscalated, self::ApprovalDecided,
++            self::ApprovalDecidedByOther, self::ApprovalExpired => 'shield-check',
++            self::BelowCostSale, self::BigDiscount => 'badge-percent',
++            self::DocumentReversed => 'undo-2',
++            self::ShiftDiscrepancy, self::CashNotClosed, self::CollectionPending => 'wallet',
++            self::CustomerReturn => 'rotate-ccw',
++            self::CustomerExport => 'file-spreadsheet',
++            self::NewDevice => 'laptop',
++            self::StorefrontMismatch => 'globe',
++            self::ReconciliationFailed => 'triangle-alert',
++            self::TransferIncoming => 'truck',
++            self::DebtDue, self::SupplierDue => 'hand-coins',
++            self::OrderOverdue => 'calendar-clock',
++            self::ImeiBlocked => 'ban',
++            self::WarrantyDue => 'wrench',
++            self::DailySummary => 'chart-column',
++            self::System => 'info',
++        };
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Http/TelegramWebhookController.php b/prime-mobile-os/app/Domain/Notifications/Http/TelegramWebhookController.php
+new file mode 100644
+index 0000000..78f11f9
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Http/TelegramWebhookController.php
+@@ -0,0 +1,25 @@
++<?php
++
++namespace App\Domain\Notifications\Http;
++
++use App\Domain\Notifications\Services\TelegramLinker;
++use Illuminate\Http\JsonResponse;
++use Illuminate\Http\Request;
++
++/**
++ * POST /telegram/webhook — updates from the Telegram bot (set the webhook with secret_token = TELEGRAM_WEBHOOK_SECRET).
++ * Without a configured secret the endpoint does not exist (404); a wrong secret is 403. No session, no CSRF.
++ */
++class TelegramWebhookController
++{
++    public function __invoke(Request $request, TelegramLinker $linker): JsonResponse
++    {
++        $secret = (string) config('services.telegram.webhook_secret');
++        abort_if($secret === '' || (string) config('services.telegram.bot_token') === '', 404);
++        abort_unless(hash_equals($secret, (string) $request->header('X-Telegram-Bot-Api-Secret-Token')), 403);
++
++        $linker->handleUpdate($request->json()->all());
++
++        return response()->json(['ok' => true]);
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Jobs/DeliverNotification.php b/prime-mobile-os/app/Domain/Notifications/Jobs/DeliverNotification.php
+new file mode 100644
+index 0000000..dc8bc1f
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Jobs/DeliverNotification.php
+@@ -0,0 +1,70 @@
++<?php
++
++namespace App\Domain\Notifications\Jobs;
++
++use App\Domain\Notifications\Channels\PushSender;
++use App\Domain\Notifications\Channels\TelegramChannel;
++use App\Domain\Notifications\Models\AppNotification;
++use App\Domain\Notifications\Models\TelegramLink;
++use App\Domain\Notifications\Services\NotificationPreferences;
++use App\Models\User;
++use App\Support\Tenancy\CurrentOrganization;
++use Illuminate\Bus\Queueable;
++use Illuminate\Contracts\Queue\ShouldQueue;
++use Illuminate\Foundation\Bus\Dispatchable;
++use Illuminate\Queue\InteractsWithQueue;
++
++/**
++ * Delivers one bell notification to the outside channels by the user's preferences: Web Push (PushSender) and the
++ * Telegram copy. Runs in the organization context it was created in (the worker clears the context before a job).
++ */
++class DeliverNotification implements ShouldQueue
++{
++    use Dispatchable, InteractsWithQueue, Queueable;
++
++    public int $tries = 3;
++
++    public array $backoff = [10, 60];
++
++    public function __construct(public readonly int $notificationId, public readonly int $organizationId)
++    {
++        $this->onQueue('notifications');
++    }
++
++    public function handle(PushSender $push, TelegramChannel $telegram, NotificationPreferences $preferences): void
++    {
++        CurrentOrganization::instance()->run($this->organizationId, function () use ($push, $telegram, $preferences) {
++            $notification = AppNotification::query()->find($this->notificationId);
++            if (! $notification || $notification->silent) {
++                return;
++            }
++            $user = User::query()->find($notification->user_id);
++            if (! $user) {
++                return;
++            }
++            $channels = $preferences->channels($user, $notification->type);
++            $status = [];
++
++            if ($notification->push_status === null) {
++                $status['push_status'] = ! $channels['push'] ? 'off'
++                    : (! $push->isConfigured() ? 'skipped' : ($push->send($user, $notification) ? 'sent' : 'failed'));
++            }
++            if ($notification->telegram_status === null || $notification->telegram_status === 'failed') {
++                $link = TelegramLink::query()->where('user_id', $user->id)->first();
++                $status['telegram_status'] = match (true) {
++                    ! $channels['telegram'] => 'off',
++                    ! $telegram->isEnabled(), ! $link?->isLinked() => 'skipped',
++                    default => $telegram->send((string) $link->chat_id, $this->telegramText($notification)) ? 'sent' : 'failed',
++                };
++            }
++            $notification->forceFill($status)->save();
++        });
++    }
++
++    private function telegramText(AppNotification $n): string
++    {
++        $org = CurrentOrganization::instance()->require();
++
++        return trim($org->name."\n".$n->title.($n->body ? "\n".$n->body : ''));
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Models/AppNotification.php b/prime-mobile-os/app/Domain/Notifications/Models/AppNotification.php
+new file mode 100644
+index 0000000..41ff969
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Models/AppNotification.php
+@@ -0,0 +1,61 @@
++<?php
++
++namespace App\Domain\Notifications\Models;
++
++use App\Domain\Notifications\Enums\NotificationType;
++use App\Models\User;
++use App\Support\Tenancy\BelongsToOrganization;
++use Illuminate\Database\Eloquent\Model;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++/**
++ * One notification of one user in the bell (TZ 04 Э28.1). Written by Notifier only; texts never contain IIN, IMEI
++ * or customer phone numbers (TZ 06 §4.2 p.1) and no cost/profit (the owner card shows those after opening).
++ *
++ * @property NotificationType $type
++ */
++class AppNotification extends Model
++{
++    use BelongsToOrganization;
++
++    protected $table = 'app_notifications';
++
++    protected $guarded = ['id'];
++
++    protected function casts(): array
++    {
++        return [
++            'type' => NotificationType::class,
++            'data' => 'array',
++            'silent' => 'boolean',
++            'read_at' => 'datetime',
++        ];
++    }
++
++    public function user(): BelongsTo
++    {
++        return $this->belongsTo(User::class);
++    }
++
++    public function isRead(): bool
++    {
++        return $this->read_at !== null;
++    }
++
++    /** Bell row for the UI (Э28.1): icon, text, time, action, unread dot. */
++    public function toBell(): array
++    {
++        return [
++            'id' => $this->id,
++            'type' => $this->type->value,
++            'icon' => $this->type->icon(),
++            'title' => $this->title,
++            'body' => $this->body,
++            'url' => $this->url,
++            'approval_request_id' => $this->approval_request_id,
++            'document_id' => $this->document_id,
++            'created_at' => $this->created_at?->toIso8601String(),
++            'unread' => $this->read_at === null,
++        ];
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Models/NotificationPreference.php b/prime-mobile-os/app/Domain/Notifications/Models/NotificationPreference.php
+new file mode 100644
+index 0000000..540b5d4
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Models/NotificationPreference.php
+@@ -0,0 +1,19 @@
++<?php
++
++namespace App\Domain\Notifications\Models;
++
++use App\Support\Tenancy\BelongsToOrganization;
++use Illuminate\Database\Eloquent\Model;
++
++/** «Что присылать» for one user × notification type (TZ 04 Э26 «Уведомления»). Absent row = type defaults. */
++class NotificationPreference extends Model
++{
++    use BelongsToOrganization;
++
++    protected $guarded = ['id'];
++
++    protected function casts(): array
++    {
++        return ['in_app' => 'boolean', 'push' => 'boolean', 'telegram' => 'boolean'];
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Models/TelegramLink.php b/prime-mobile-os/app/Domain/Notifications/Models/TelegramLink.php
+new file mode 100644
+index 0000000..0b41883
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Models/TelegramLink.php
+@@ -0,0 +1,26 @@
++<?php
++
++namespace App\Domain\Notifications\Models;
++
++use App\Support\Tenancy\BelongsToOrganization;
++use Illuminate\Database\Eloquent\Model;
++
++/** Telegram chat of a user in an organization (Э26 «Привязка Telegram»: «Подключить» → бот → /start <token>). */
++class TelegramLink extends Model
++{
++    use BelongsToOrganization;
++
++    protected $guarded = ['id'];
++
++    protected $hidden = ['link_token'];
++
++    protected function casts(): array
++    {
++        return ['linked_at' => 'datetime', 'token_expires_at' => 'datetime'];
++    }
++
++    public function isLinked(): bool
++    {
++        return $this->chat_id !== null && $this->linked_at !== null;
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Services/NotificationCenter.php b/prime-mobile-os/app/Domain/Notifications/Services/NotificationCenter.php
+new file mode 100644
+index 0000000..d27e488
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Services/NotificationCenter.php
+@@ -0,0 +1,67 @@
++<?php
++
++namespace App\Domain\Notifications\Services;
++
++use App\Domain\Approvals\Services\ApprovalQueries;
++use App\Domain\Notifications\Models\AppNotification;
++use App\Models\User;
++use Illuminate\Support\Collection;
++
++/**
++ * API of the bell (TZ 04 Э28.1) for Livewire / Filament: tabs «Заявки (2)» · «Уведомления» · «Мои заявки».
++ * Everything is scoped to the current organization and to the given user; ids from the browser are checked here.
++ *
++ *   $center->bell($user)          // ['approvals' => 2, 'notifications' => 5, 'my_requests' => 1, 'badge' => 7]
++ *   $center->latest($user, 30)    // Collection of AppNotification (->toBell() for the row)
++ *   $center->markRead($user, $id); $center->markAllRead($user);
++ */
++class NotificationCenter
++{
++    public function __construct(private readonly ApprovalQueries $approvals) {}
++
++    /** @return array{approvals: int, notifications: int, my_requests: int, badge: int} */
++    public function bell(User $user): array
++    {
++        $approvals = $this->approvals->awaitingCount($user);
++        $notifications = $this->unreadCount($user);
++
++        return [
++            'approvals' => $approvals,
++            'notifications' => $notifications,
++            'my_requests' => $this->approvals->mineOpenCount($user),
++            'badge' => $approvals + $notifications,
++        ];
++    }
++
++    public function unreadCount(User $user): int
++    {
++        return AppNotification::query()->where('user_id', $user->id)->whereNull('read_at')->count();
++    }
++
++    /** @return Collection<int, AppNotification> */
++    public function latest(User $user, int $limit = 30, bool $unreadOnly = false): Collection
++    {
++        return AppNotification::query()->where('user_id', $user->id)
++            ->when($unreadOnly, fn ($q) => $q->whereNull('read_at'))
++            ->orderByDesc('id')->limit(max(1, min($limit, 100)))->get();
++    }
++
++    /** Marks one own notification read; another user's id (forged in the browser) is ignored. */
++    public function markRead(User $user, int $notificationId): bool
++    {
++        return AppNotification::query()->whereKey($notificationId)->where('user_id', $user->id)->whereNull('read_at')
++            ->update(['read_at' => now(), 'updated_at' => now()]) > 0;
++    }
++
++    public function markAllRead(User $user): int
++    {
++        return AppNotification::query()->where('user_id', $user->id)->whereNull('read_at')->update(['read_at' => now(), 'updated_at' => now()]);
++    }
++
++    /** Mark read the notifications about one approval request (the user opened its card). */
++    public function markReadForRequest(User $user, int $requestId): int
++    {
++        return AppNotification::query()->where('user_id', $user->id)->where('approval_request_id', $requestId)->whereNull('read_at')
++            ->update(['read_at' => now(), 'updated_at' => now()]);
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Services/NotificationPreferences.php b/prime-mobile-os/app/Domain/Notifications/Services/NotificationPreferences.php
+new file mode 100644
+index 0000000..33f4471
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Services/NotificationPreferences.php
+@@ -0,0 +1,65 @@
++<?php
++
++namespace App\Domain\Notifications\Services;
++
++use App\Domain\Notifications\Enums\NotificationType;
++use App\Domain\Notifications\Models\NotificationPreference;
++use App\Models\User;
++
++/**
++ * «Что присылать» (TZ 04 Э26 «Уведомления», TZ 06 §4.1 «каждую сводку можно выключить»): channels per user and
++ * notification type. In-app (the bell) cannot be switched off for approvals — a request must never be lost.
++ *
++ *   $prefs->channels($owner, NotificationType::BigDiscount)  // ['in_app' => true, 'push' => true, 'telegram' => false]
++ *   $prefs->set($owner, NotificationType::BigDiscount, push: false, telegram: true);
++ */
++class NotificationPreferences
++{
++    /** @return array{in_app: bool, push: bool, telegram: bool} */
++    public function channels(User|int $user, NotificationType $type): array
++    {
++        $row = NotificationPreference::query()->where('user_id', $this->id($user))->where('type', $type->value)->first();
++        $defaults = ['in_app' => true, 'push' => $type->defaultPush(), 'telegram' => $type->defaultTelegram()];
++        if (! $row) {
++            return $defaults;
++        }
++
++        return [
++            'in_app' => $this->alwaysInApp($type) ? true : (bool) $row->in_app,
++            'push' => (bool) $row->push,
++            'telegram' => (bool) $row->telegram,
++        ];
++    }
++
++    /** @return array<string, array{label: string, in_app: bool, push: bool, telegram: bool}> owner settings table */
++    public function table(User|int $user): array
++    {
++        $out = [];
++        foreach (NotificationType::ownerConfigurable() as $type) {
++            $out[$type->value] = ['label' => $type->label()] + $this->channels($user, $type);
++        }
++
++        return $out;
++    }
++
++    public function set(User|int $user, NotificationType $type, bool $push, bool $telegram, bool $inApp = true): NotificationPreference
++    {
++        $row = NotificationPreference::query()->updateOrCreate(
++            ['user_id' => $this->id($user), 'type' => $type->value],
++            ['in_app' => $this->alwaysInApp($type) ? true : $inApp, 'push' => $push, 'telegram' => $telegram],
++        );
++        activity('settings')->performedOn($row)->withProperties(['type' => $type->value, 'push' => $push, 'telegram' => $telegram])->log('notification_preference');
++
++        return $row;
++    }
++
++    private function alwaysInApp(NotificationType $type): bool
++    {
++        return in_array($type, [NotificationType::ApprovalNew, NotificationType::ApprovalEscalated, NotificationType::ApprovalDecided], true);
++    }
++
++    private function id(User|int $user): int
++    {
++        return $user instanceof User ? $user->id : $user;
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Services/Notifier.php b/prime-mobile-os/app/Domain/Notifications/Services/Notifier.php
+new file mode 100644
+index 0000000..3d6275c
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Services/Notifier.php
+@@ -0,0 +1,81 @@
++<?php
++
++namespace App\Domain\Notifications\Services;
++
++use App\Domain\Notifications\Enums\NotificationType;
++use App\Domain\Notifications\Jobs\DeliverNotification;
++use App\Domain\Notifications\Models\AppNotification;
++use App\Models\User;
++use App\Support\Tenancy\CurrentOrganization;
++use Illuminate\Support\Collection;
++
++/**
++ * The single entry point to notify people of the current organization (TZ 04 Э28, TZ 06 §4.3). Writes the bell row
++ * at once (in the caller's transaction) and queues the delivery (push / Telegram) AFTER commit, so a rolled back
++ * operation never pings the owner.
++ *
++ *   $notifier->toOwners(NotificationType::ShiftDiscrepancy, 'Смена закрыта: недостача 2 000 ₸ (Дана)', null,
++ *       ['document_id' => $doc->id, 'url' => '/admin/shifts/12']);
++ *
++ * Texts: no IIN, IMEI, customer phones (TZ 06 §4.2 p.1); no cost / profit (the card shows them after opening, to
++ * those who may see them — TZ 03 §4.2 p.2 «уведомления»). Options: data, url, approval_request_id, document_id,
++ * silent (feed only, no push), headline (lock-screen text without money).
++ */
++class Notifier
++{
++    public function __construct(private readonly Recipients $recipients) {}
++
++    /** @param array{data?: array, url?: string, approval_request_id?: int, document_id?: int, silent?: bool, headline?: string} $options */
++    public function toUser(User|int $user, NotificationType $type, string $title, ?string $body = null, array $options = []): ?AppNotification
++    {
++        $userId = $user instanceof User ? $user->id : $user;
++        if (! $this->recipients->isActiveMember($userId)) {
++            return null;
++        }
++        $data = $options['data'] ?? [];
++        if (isset($options['headline'])) {
++            $data['headline'] = $options['headline'];
++        }
++        $notification = AppNotification::query()->create([
++            'user_id' => $userId,
++            'type' => $type->value,
++            'title' => mb_substr($title, 0, 200),
++            'body' => $body,
++            'data' => $data ?: null,
++            'url' => $options['url'] ?? null,
++            'approval_request_id' => $options['approval_request_id'] ?? null,
++            'document_id' => $options['document_id'] ?? null,
++            'silent' => (bool) ($options['silent'] ?? false),
++        ]);
++        if (! $notification->silent) {
++            DeliverNotification::dispatch($notification->id, CurrentOrganization::instance()->requireId())->afterCommit();
++        }
++
++        return $notification;
++    }
++
++    /** @param iterable<User|int> $users @return Collection<int, AppNotification> */
++    public function toUsers(iterable $users, NotificationType $type, string $title, ?string $body = null, array $options = []): Collection
++    {
++        $sent = collect();
++        $seen = [];
++        foreach ($users as $user) {
++            $id = $user instanceof User ? $user->id : (int) $user;
++            if (isset($seen[$id])) {
++                continue;
++            }
++            $seen[$id] = true;
++            if ($n = $this->toUser($id, $type, $title, $body, $options)) {
++                $sent->push($n);
++            }
++        }
++
++        return $sent;
++    }
++
++    /** @return Collection<int, AppNotification> */
++    public function toOwners(NotificationType $type, string $title, ?string $body = null, array $options = []): Collection
++    {
++        return $this->toUsers($this->recipients->owners(), $type, $title, $body, $options);
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Services/Recipients.php b/prime-mobile-os/app/Domain/Notifications/Services/Recipients.php
+new file mode 100644
+index 0000000..3ef8a9a
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Services/Recipients.php
+@@ -0,0 +1,71 @@
++<?php
++
++namespace App\Domain\Notifications\Services;
++
++use App\Domain\Tenancy\Access\AccessChecker;
++use App\Domain\Tenancy\Enums\MembershipStatus;
++use App\Domain\Tenancy\Models\Membership;
++use App\Models\User;
++use App\Support\Tenancy\CurrentOrganization;
++use Illuminate\Support\Collection;
++use Illuminate\Support\Facades\DB;
++
++/**
++ * Who of the CURRENT organization receives something: owners, people with a permission. Only active members
++ * (a dismissed or blocked employee, an integrator never get notifications — TZ 03 §15). Uses AccessChecker,
++ * not $user->can(): spatie does not look at the membership status (CORE.md §13 p.6).
++ */
++class Recipients
++{
++    public function __construct(private readonly AccessChecker $access) {}
++
++    /** @return Collection<int, User> active owners of the current organization */
++    public function owners(): Collection
++    {
++        $orgId = CurrentOrganization::instance()->requireId();
++        $ids = DB::table('model_has_roles as mr')
++            ->join('roles as r', 'r.id', '=', 'mr.role_id')
++            ->where('mr.organization_id', $orgId)
++            ->where('mr.model_type', (new User)->getMorphClass())
++            ->where('r.is_owner', true)
++            ->pluck('mr.model_id');
++
++        return $this->activeUsers($ids);
++    }
++
++    /** @return Collection<int, User> active members whose role has the permission (and the store, if given) */
++    public function withPermission(string $permission, ?int $storeId = null): Collection
++    {
++        $ids = Membership::query()->where('status', MembershipStatus::Active->value)->pluck('user_id');
++
++        return User::query()->whereIn('id', $ids)->orderBy('id')->get()
++            ->filter(fn (User $u) => ! $this->access->decide($u, $permission, storeId: $storeId)->isDenied())
++            ->values();
++    }
++
++    public function isActiveMember(User|int $user): bool
++    {
++        return Membership::query()->where('user_id', $user instanceof User ? $user->id : $user)
++            ->where('status', MembershipStatus::Active->value)->exists();
++    }
++
++    /** «Дана» from «Дана Сапарова» — for short texts (lock screen, Telegram). */
++    public static function firstName(?User $user): string
++    {
++        if (! $user) {
++            return __('Сотрудник');
++        }
++        $parts = preg_split('/\s+/u', trim((string) $user->name));
++
++        return $parts[0] ?? (string) $user->name;
++    }
++
++    /** @param  iterable<int>  $ids */
++    private function activeUsers(iterable $ids): Collection
++    {
++        $active = Membership::query()->where('status', MembershipStatus::Active->value)
++            ->whereIn('user_id', collect($ids)->all())->pluck('user_id');
++
++        return User::query()->whereIn('id', $active)->orderBy('id')->get();
++    }
++}
+diff --git a/prime-mobile-os/app/Domain/Notifications/Services/TelegramLinker.php b/prime-mobile-os/app/Domain/Notifications/Services/TelegramLinker.php
+new file mode 100644
+index 0000000..67fb810
+--- /dev/null
++++ b/prime-mobile-os/app/Domain/Notifications/Services/TelegramLinker.php
+@@ -0,0 +1,78 @@
++<?php
++
++namespace App\Domain\Notifications\Services;
++
++use App\Domain\Notifications\Channels\TelegramChannel;
++use App\Domain\Notifications\Models\TelegramLink;
++use App\Models\User;
++use App\Support\Tenancy\CurrentOrganization;
++use Illuminate\Support\Str;
++
++/**
++ * Linking a user's Telegram chat (Э26 «Подключить» → бот): the screen shows the deep link
++ * https://t.me/<bot>?start=<token>; Telegram sends «/start <token>» to the webhook (TelegramWebhookController),
++ * the chat id is stored. A token lives 30 minutes and works once.
++ */
++class TelegramLinker
++{
++    public function __construct(private readonly TelegramChannel $telegram) {}
++
++    /** Deep link for the current organization and user; null when Telegram is off or the bot name is not set. */
++    public function linkUrl(User $user): ?string
++    {
++        if (! $this->telegram->isEnabled() || ! ($bot = $this->telegram->botUsername())) {
++            return null;
++        }
++        $token = Str::random(40);
++        TelegramLink::query()->updateOrCreate(['user_id' => $user->id], ['link_token' => $token, 'token_expires_at' => now()->addMinutes(30)]);
++
++        return "https://t.me/{$bot}?start={$token}";
++    }
++
++    /** Integrator / tests: set the chat id directly. */
++    public function linkChat(User $user, string $chatId): TelegramLink
++    {
++        return TelegramLink::query()->updateOrCreate(['user_id' => $user->id], [
++            'chat_id' => $chatId, 'linked_at' => now(), 'link_token' => null, 'token_expires_at' => null,
++        ]);
++    }
++
++    public function unlink(User $user): void
++    {
++        TelegramLink::query()->where('user_id', $user->id)->update(['chat_id' => null, 'linked_at' => null, 'link_token' => null, 'updated_at' => now()]);
++    }
++
++    public function isLinked(User $user): bool
++    {
++        return (bool) TelegramLink::query()->where('user_id', $user->id)->first()?->isLinked();
++    }
++
++    /**
++     * Webhook update from Telegram. Only «/start <token>» of a valid token links a chat; everything else is ignored.
++     *
++     * @return bool linked
++     */
++    public function handleUpdate(array $update): bool
++    {
++        $text = trim((string) data_get($update, 'message.text'));
++        $chatId = data_get($update, 'message.chat.id');
++        if ($chatId === null || ! preg_match('/^\/start\s+([A-Za-z0-9]{20,64})$/', $text, $m)) {
++            return false;
++        }
++        // the token tells us the organization: system lookup without the tenant scope
++        $link = TelegramLink::withoutOrganizationScope()->where('link_token', $m[1])->where('token_expires_at', '>', now())->first();
++        if (! $link) {
++            $this->telegram->send((string) $chatId, __('Ссылка устарела. Откройте «Настройки → Уведомления» и нажмите «Подключить» ещё раз'));
++
++            return false;
++        }
++
++        return CurrentOrganization::instance()->run((int) $link->organization_id, function () use ($link, $chatId) {
++            $link->forceFill(['chat_id' => (string) $chatId, 'linked_at' => now(), 'link_token' => null, 'token_expires_at' => null])->save();
++            activity('settings')->performedOn($link)->causedBy(User::query()->find($link->user_id))->log('telegram_linked');
++            $this->telegram->send((string) $chatId, __('Готово: уведомления :org подключены', ['org' => CurrentOrganization::instance()->require()->name]));
++
++            return true;
++        });
++    }
++}
+diff --git a/prime-mobile-os/database/migrations/2026_11_10_110000_approvals_create_approval_requests.php b/prime-mobile-os/database/migrations/2026_11_10_110000_approvals_create_approval_requests.php
+new file mode 100644
+index 0000000..fd3804a
+--- /dev/null
++++ b/prime-mobile-os/database/migrations/2026_11_10_110000_approvals_create_approval_requests.php
+@@ -0,0 +1,78 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Approval requests to the owner (TZ 03 §6, TZ 01 П9): one row per request. A request is bound to ONE operation:
++ * a draft document (document_id), the original document of a reversal (subject_document_id) or a non-document
++ * action (action_type + action_key). The fingerprint of the operation is stored at request time; an approval is
++ * valid 15 minutes after the decision and only for one posting (used_document_id).
++ *
++ * documents.approval_request_id gets no FK on purpose: a draft may carry any id from the client — the gate
++ * (DatabaseApprovalGate) checks that the request belongs to this document and the Poster drops an id that
++ * authorized nothing (CORE.md §11).
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('approval_requests', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('store_id')->nullable()->constrained()->restrictOnDelete();
++            $table->string('kind', 48);                                  // main requirement: discount, debt, return, …
++            $table->string('status', 16)->default('pending');            // pending|approved|rejected|cancelled|expired|used|lapsed
++            $table->foreignId('requested_by')->constrained('users')->restrictOnDelete();
++            $table->foreignId('document_id')->nullable()->constrained('documents')->restrictOnDelete();
++            $table->foreignId('subject_document_id')->nullable()->constrained('documents')->restrictOnDelete();
++            $table->string('action_type', 48)->nullable();               // non-document actions (price change, export, …)
++            $table->char('action_key', 64)->nullable();                  // sha256 of the action payload
++            $table->jsonb('requirements');                               // what exceeded which limit (list)
++            $table->jsonb('fingerprint');                                // group => sha256 of the operation data
++            $table->jsonb('values')->nullable();                         // amounts of the operation at request time
++            $table->string('headline', 200);                             // lock screen: «Дана просит разрешение: скидка»
++            $table->text('summary');                                     // what is asked, without personal data
++            $table->jsonb('context')->nullable();                        // card context (customer, seller's day), in-app only
++            $table->jsonb('sensitive')->nullable();                      // cost / profit — only via ApprovalPresenter::forViewer()
++            $table->bigInteger('max_value')->default(0);                 // money size of the request, tiyn
++            $table->boolean('needs_confirmation')->default(false);       // PIN before «Разрешить» (TZ 03 §6.3 p.3, §10)
++            $table->string('reason_code', 32)->nullable();
++            $table->text('reason_text')->nullable();
++            $table->foreignId('decided_by')->nullable()->constrained('users')->restrictOnDelete();
++            $table->timestampTz('decided_at')->nullable();
++            $table->text('decision_comment')->nullable();
++            $table->jsonb('approved_values')->nullable();                // «Разрешить с изменением»
++            $table->jsonb('released_groups')->nullable();
++            $table->timestampTz('expires_at');                           // pending request lives 30 min
++            $table->timestampTz('valid_until')->nullable();              // approval valid 15 min after the answer
++            $table->timestampTz('reminded_at')->nullable();              // repeated push after 3 min
++            $table->timestampTz('escalated_at')->nullable();             // visible to admins after 5 min
++            $table->foreignId('used_document_id')->nullable()->constrained('documents')->restrictOnDelete();
++            $table->timestampTz('used_at')->nullable();
++            $table->timestampTz('closed_at')->nullable();                // cancelled / expired / lapsed moment
++            $table->timestampsTz();
++
++            $table->index(['organization_id', 'status', 'created_at']);
++            $table->index(['organization_id', 'requested_by', 'status']);
++            $table->index('document_id');
++            $table->index('subject_document_id');
++            $table->index(['organization_id', 'action_type', 'action_key']);
++        });
++        DB::statement("ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_status_check CHECK (status IN ('pending','approved','rejected','cancelled','expired','used','lapsed'))");
++        DB::statement('ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_subject_check CHECK (num_nonnulls(document_id, subject_document_id, action_type) = 1)');
++        DB::statement('CREATE UNIQUE INDEX approval_requests_org_id_unique ON approval_requests (organization_id, id)');
++        // the same firm only (CORE.md §11): store and documents of the request
++        foreach (['store_id' => 'stores', 'document_id' => 'documents', 'subject_document_id' => 'documents', 'used_document_id' => 'documents'] as $column => $referenced) {
++            DB::statement("ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_{$column}_same_org_fk
++                FOREIGN KEY (organization_id, {$column}) REFERENCES {$referenced} (organization_id, id) ON DELETE RESTRICT");
++        }
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('approval_requests');
++    }
++};
+diff --git a/prime-mobile-os/database/migrations/2026_11_10_110100_notifications_create_notifications.php b/prime-mobile-os/database/migrations/2026_11_10_110100_notifications_create_notifications.php
+new file mode 100644
+index 0000000..c453386
+--- /dev/null
++++ b/prime-mobile-os/database/migrations/2026_11_10_110100_notifications_create_notifications.php
+@@ -0,0 +1,71 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * In-app notifications (bell, TZ 04 Э28.1), per-user channel preferences («что присылать владельцу», Э26) and
++ * Telegram links (TZ 01 П9 p.2: the Telegram copy of pushes). Telegram gets no personal data (TZ 06 §4.2 p.1).
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('app_notifications', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('user_id')->constrained()->cascadeOnDelete();       // recipient
++            $table->string('type', 48);
++            $table->string('title', 200);
++            $table->text('body')->nullable();
++            $table->jsonb('data')->nullable();
++            $table->string('url', 500)->nullable();
++            $table->unsignedBigInteger('approval_request_id')->nullable();
++            $table->unsignedBigInteger('document_id')->nullable();
++            $table->boolean('silent')->default(false);                            // feed only, no push / Telegram
++            $table->string('push_status', 16)->nullable();                        // sent | skipped | failed
++            $table->string('telegram_status', 16)->nullable();
++            $table->timestampTz('read_at')->nullable();
++            $table->timestampsTz();
++            $table->index(['organization_id', 'user_id', 'read_at', 'id']);
++            $table->index('approval_request_id');
++        });
++        DB::statement('ALTER TABLE app_notifications ADD CONSTRAINT app_notifications_request_same_org_fk
++            FOREIGN KEY (organization_id, approval_request_id) REFERENCES approval_requests (organization_id, id) ON DELETE RESTRICT');
++        DB::statement('ALTER TABLE app_notifications ADD CONSTRAINT app_notifications_document_same_org_fk
++            FOREIGN KEY (organization_id, document_id) REFERENCES documents (organization_id, id) ON DELETE RESTRICT');
++
++        Schema::create('notification_preferences', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
++            $table->string('type', 48);
++            $table->boolean('in_app')->default(true);
++            $table->boolean('push')->default(true);
++            $table->boolean('telegram')->default(false);
++            $table->timestampsTz();
++            $table->unique(['organization_id', 'user_id', 'type']);
++        });
++
++        Schema::create('telegram_links', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
++            $table->string('chat_id', 32)->nullable();
++            $table->string('link_token', 64)->nullable()->unique();
++            $table->timestampTz('token_expires_at')->nullable();
++            $table->timestampTz('linked_at')->nullable();
++            $table->timestampsTz();
++            $table->unique(['organization_id', 'user_id']);
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('telegram_links');
++        Schema::dropIfExists('notification_preferences');
++        Schema::dropIfExists('app_notifications');
++    }
++};
+diff --git a/prime-mobile-os/database/migrations/2026_11_10_110200_shifts_extend_shifts.php b/prime-mobile-os/database/migrations/2026_11_10_110200_shifts_extend_shifts.php
+new file mode 100644
+index 0000000..6208275
+--- /dev/null
++++ b/prime-mobile-os/database/migrations/2026_11_10_110200_shifts_extend_shifts.php
+@@ -0,0 +1,90 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Cash register shifts (TZ 02 §8, TZ 01 П1, П19): ONE open shift per store; opening and closing are documents
++ * «СМН» (type shift_close) whose detail rows shift_counts keep «по учёту / посчитано / разница» per cash account
++ * (₸ and $). A difference is written at once as a money entry «Недостача/излишек кассы».
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::table('shifts', function (Blueprint $table) {
++            $table->string('status', 16)->default('open');                         // open | closed | auto_closed
++            $table->unsignedBigInteger('usd_account_id')->nullable();
++            $table->bigInteger('opening_expected_usd')->nullable();
++            $table->bigInteger('opening_counted_usd')->nullable();
++            $table->bigInteger('closing_expected_usd')->nullable();
++            $table->bigInteger('closing_counted_usd')->nullable();
++            $table->jsonb('opening_denominations')->nullable();
++            $table->text('opening_comment')->nullable();
++            $table->text('closing_comment')->nullable();
++            $table->bigInteger('kaspi_reported')->nullable();                      // «Итог Kaspi Pay за смену» (П19 p.4)
++            $table->unsignedBigInteger('opening_document_id')->nullable();
++            $table->unsignedBigInteger('closing_document_id')->nullable();
++            $table->string('resolution', 16)->nullable();                          // accepted | withheld (П19 p.7)
++            $table->foreignId('resolved_by')->nullable()->constrained('users')->restrictOnDelete();
++            $table->timestampTz('resolved_at')->nullable();
++            $table->text('resolution_comment')->nullable();
++            $table->jsonb('report')->nullable();                                   // Ф10 snapshot at closing
++            $table->timestampTz('not_closed_notified_at')->nullable();
++        });
++        DB::statement("ALTER TABLE shifts ADD CONSTRAINT shifts_status_check CHECK (status IN ('open','closed','auto_closed') AND ((status = 'open') = (closed_at IS NULL)))");
++        DB::statement("ALTER TABLE shifts ADD CONSTRAINT shifts_resolution_check CHECK (resolution IS NULL OR resolution IN ('accepted','withheld'))");
++        // «одна смена на магазин» (TZ README «Касса»)
++        DB::statement('CREATE UNIQUE INDEX shifts_one_open_per_store ON shifts (store_id) WHERE closed_at IS NULL');
++        DB::statement('CREATE UNIQUE INDEX shifts_org_id_unique ON shifts (organization_id, id)');
++        foreach (['usd_account_id' => 'money_accounts', 'opening_document_id' => 'documents', 'closing_document_id' => 'documents'] as $column => $referenced) {
++            DB::statement("ALTER TABLE shifts ADD CONSTRAINT shifts_{$column}_same_org_fk
++                FOREIGN KEY (organization_id, {$column}) REFERENCES {$referenced} (organization_id, id) ON DELETE RESTRICT");
++        }
++
++        Schema::create('shift_counts', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('document_id')->constrained()->cascadeOnDelete();
++            $table->unsignedBigInteger('shift_id')->nullable();                     // set when the shift row exists
++            $table->string('phase', 8);                                            // open | close
++            $table->unsignedBigInteger('account_id');
++            $table->char('currency', 3);
++            $table->bigInteger('expected')->nullable();                            // by the journal, filled at posting
++            $table->bigInteger('counted');
++            $table->bigInteger('difference')->nullable();
++            $table->jsonb('denominations')->nullable();                            // {"20000": 3, "5000": 1, …}
++            $table->timestampsTz();
++            $table->index('document_id');
++        });
++        DB::statement("ALTER TABLE shift_counts ADD CONSTRAINT shift_counts_check CHECK (counted >= 0 AND phase IN ('open','close'))");
++        DB::statement('ALTER TABLE shift_counts ADD CONSTRAINT shift_counts_account_same_org_fk
++            FOREIGN KEY (organization_id, account_id) REFERENCES money_accounts (organization_id, id) ON DELETE RESTRICT');
++        DB::statement('ALTER TABLE shift_counts ADD CONSTRAINT shift_counts_shift_same_org_fk
++            FOREIGN KEY (organization_id, shift_id) REFERENCES shifts (organization_id, id) ON DELETE RESTRICT');
++        // shift_id is linked right after the opening document is posted (the row is created inside the posting)
++        DB::unprepared("CREATE TRIGGER shift_counts_posted_guard BEFORE INSERT OR UPDATE OR DELETE ON shift_counts FOR EACH ROW EXECUTE FUNCTION pm_posted_detail_guard('shift_id')");
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('shift_counts');
++        DB::statement('DROP INDEX IF EXISTS shifts_one_open_per_store');
++        foreach (['usd_account_id', 'opening_document_id', 'closing_document_id'] as $column) {
++            DB::statement("ALTER TABLE shifts DROP CONSTRAINT IF EXISTS shifts_{$column}_same_org_fk");
++        }
++        DB::statement('DROP INDEX IF EXISTS shifts_org_id_unique');
++        DB::statement('ALTER TABLE shifts DROP CONSTRAINT IF EXISTS shifts_status_check');
++        DB::statement('ALTER TABLE shifts DROP CONSTRAINT IF EXISTS shifts_resolution_check');
++        Schema::table('shifts', function (Blueprint $table) {
++            $table->dropConstrainedForeignId('resolved_by');
++            $table->dropColumn([
++                'status', 'usd_account_id', 'opening_expected_usd', 'opening_counted_usd', 'closing_expected_usd', 'closing_counted_usd',
++                'opening_denominations', 'opening_comment', 'closing_comment', 'kaspi_reported', 'opening_document_id', 'closing_document_id',
++                'resolution', 'resolved_at', 'resolution_comment', 'report', 'not_closed_notified_at',
++            ]);
++        });
++    }
++};
+diff --git a/prime-mobile-os/database/migrations/2026_11_10_110300_money_create_cash_moves.php b/prime-mobile-os/database/migrations/2026_11_10_110300_money_create_cash_moves.php
+new file mode 100644
+index 0000000..cb9ab51
+--- /dev/null
++++ b/prime-mobile-os/database/migrations/2026_11_10_110300_money_create_cash_moves.php
+@@ -0,0 +1,47 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * «Движение денег» ДДС (TZ 02 §6.2 №37–39, TZ 01 П18): deposit, withdrawal, transfer between accounts of one
++ * currency, collection (register → «в пути» → safe / owner, accepted by the owner) and the cash adjustment
++ * (limit L16). One document = one currency.
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('cash_moves', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('document_id')->unique()->constrained()->cascadeOnDelete();
++            $table->string('kind', 24);                     // deposit|withdrawal|transfer|collection|collection_accept|adjustment
++            $table->unsignedBigInteger('from_account_id')->nullable();
++            $table->unsignedBigInteger('to_account_id')->nullable();
++            $table->bigInteger('amount');                   // minor units of the account currency (adjustment: signed)
++            $table->bigInteger('fee_amount')->default(0);   // transfer commission, from the source account
++            $table->string('target', 8)->nullable();        // collection: safe | owner
++            $table->unsignedBigInteger('collection_document_id')->nullable(); // accept → its collection
++            $table->string('status', 16)->nullable();       // collection: sent | accepted (changes after posting)
++            $table->unsignedBigInteger('accepted_document_id')->nullable();
++            $table->text('description')->nullable();
++            $table->timestampsTz();
++            $table->index(['organization_id', 'kind', 'status']);
++        });
++        DB::statement("ALTER TABLE cash_moves ADD CONSTRAINT cash_moves_kind_check CHECK (kind IN ('deposit','withdrawal','transfer','collection','collection_accept','adjustment'))");
++        DB::statement("ALTER TABLE cash_moves ADD CONSTRAINT cash_moves_amount_check CHECK (amount <> 0 AND (kind = 'adjustment' OR amount > 0) AND fee_amount >= 0)");
++        foreach (['from_account_id' => 'money_accounts', 'to_account_id' => 'money_accounts', 'collection_document_id' => 'documents', 'accepted_document_id' => 'documents'] as $column => $referenced) {
++            DB::statement("ALTER TABLE cash_moves ADD CONSTRAINT cash_moves_{$column}_same_org_fk
++                FOREIGN KEY (organization_id, {$column}) REFERENCES {$referenced} (organization_id, id) ON DELETE RESTRICT");
++        }
++        DB::unprepared("CREATE TRIGGER cash_moves_posted_guard BEFORE INSERT OR UPDATE OR DELETE ON cash_moves FOR EACH ROW EXECUTE FUNCTION pm_posted_detail_guard('status', 'accepted_document_id')");
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('cash_moves');
++    }
++};
+diff --git a/prime-mobile-os/database/migrations/2026_11_10_110400_debts_create_debt_adjustments.php b/prime-mobile-os/database/migrations/2026_11_10_110400_debts_create_debt_adjustments.php
+new file mode 100644
+index 0000000..02725d4
+--- /dev/null
++++ b/prime-mobile-os/database/migrations/2026_11_10_110400_debts_create_debt_adjustments.php
+@@ -0,0 +1,37 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * «Корректировка долга» КДЛ (TZ 02 §6.2 №35, TZ 01 П14.1): ± debt of a customer or supplier with a reason, and the
++ * postponement of a customer due date (TZ 03 №25 debt.customer_postpone) as a pair of entries.
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('debt_adjustments', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('document_id')->unique()->constrained()->cascadeOnDelete();
++            $table->string('operation', 16);                 // adjust | postpone
++            $table->string('counterparty_type', 16);         // customer | supplier
++            $table->unsignedBigInteger('counterparty_id');
++            $table->char('currency', 3)->default('KZT');
++            $table->bigInteger('amount');                    // adjust: + they owe us more / − less; postpone: moved amount
++            $table->date('due_date')->nullable();            // new due date (customer increase, postpone)
++            $table->date('previous_due_date')->nullable();   // postpone: filled at posting
++            $table->timestampsTz();
++        });
++        DB::statement("ALTER TABLE debt_adjustments ADD CONSTRAINT debt_adjustments_check CHECK (amount <> 0 AND operation IN ('adjust','postpone') AND counterparty_type IN ('customer','supplier') AND (operation = 'adjust' OR (amount > 0 AND due_date IS NOT NULL)))");
++        DB::unprepared("CREATE TRIGGER debt_adjustments_posted_guard BEFORE INSERT OR UPDATE OR DELETE ON debt_adjustments FOR EACH ROW EXECUTE FUNCTION pm_posted_detail_guard()");
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('debt_adjustments');
++    }
++};
+diff --git a/prime-mobile-os/database/migrations/2026_11_10_110500_loyalty_create_bonus_manual_lines.php b/prime-mobile-os/database/migrations/2026_11_10_110500_loyalty_create_bonus_manual_lines.php
+new file mode 100644
+index 0000000..4746496
+--- /dev/null
++++ b/prime-mobile-os/database/migrations/2026_11_10_110500_loyalty_create_bonus_manual_lines.php
+@@ -0,0 +1,37 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * «Бонусы вручную» БНС (TZ 02 §6.2 №42) and the nightly expiry of bonuses (№43, kind expire) — both are
++ * bonus_manual documents; lines are customers × signed whole bonuses.
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('bonus_manual_lines', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('document_id')->constrained()->cascadeOnDelete();
++            $table->unsignedBigInteger('customer_id');
++            $table->string('kind', 8)->default('manual');   // manual | expire
++            $table->bigInteger('amount');                   // whole bonuses: + gift / compensation, − write-off / expiry
++            $table->string('comment')->nullable();
++            $table->timestampsTz();
++            $table->index('document_id');
++        });
++        DB::statement("ALTER TABLE bonus_manual_lines ADD CONSTRAINT bonus_manual_lines_check CHECK (amount <> 0 AND kind IN ('manual','expire') AND (kind = 'manual' OR amount < 0))");
++        DB::statement('ALTER TABLE bonus_manual_lines ADD CONSTRAINT bonus_manual_lines_customer_same_org_fk
++            FOREIGN KEY (organization_id, customer_id) REFERENCES customers (organization_id, id) ON DELETE RESTRICT');
++        DB::unprepared('CREATE TRIGGER bonus_manual_lines_posted_guard BEFORE INSERT OR UPDATE OR DELETE ON bonus_manual_lines FOR EACH ROW EXECUTE FUNCTION pm_posted_detail_guard()');
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('bonus_manual_lines');
++    }
++};
+diff --git a/prime-mobile-os/database/migrations/2026_11_10_110600_orders_create_orders.php b/prime-mobile-os/database/migrations/2026_11_10_110600_orders_create_orders.php
+new file mode 100644
+index 0000000..1221611
+--- /dev/null
++++ b/prime-mobile-os/database/migrations/2026_11_10_110600_orders_create_orders.php
+@@ -0,0 +1,75 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Orders (bookings) ЗАК (TZ 01 П10.2, TZ 02 §6.2 №22–23, §10.3, TZ 04 Э7): a concrete phone (status ordered) or a
++ * variant «под заказ», price fixed at the order, hold 3 days, optional prepayment = money + customer advance.
++ * The order document is immutable; its lifecycle columns (status, hold, linked sale/cancellation, phone) change
++ * after posting. Cancelling with a refund is a second «order» document (order_cancellations).
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('orders', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('document_id')->unique()->constrained()->cascadeOnDelete();
++            $table->unsignedBigInteger('customer_id');
++            $table->foreignId('seller_id')->constrained('users')->restrictOnDelete();
++            $table->string('kind', 8);                              // unit | variant
++            $table->unsignedBigInteger('stock_unit_id')->nullable();
++            $table->foreignId('variant_id')->nullable()->constrained()->restrictOnDelete();
++            $table->bigInteger('price');                            // fixed at the order, tiyn
++            $table->bigInteger('list_price')->nullable();           // price list at the order (discount check)
++            $table->timestampTz('hold_until');
++            $table->bigInteger('prepayment')->default(0);
++            $table->string('prepayment_method', 32)->nullable();
++            $table->unsignedBigInteger('prepayment_account_id')->nullable();
++            $table->string('status', 16)->default('draft');         // draft|active|overdue|sold|cancelled|expired
++            $table->unsignedBigInteger('sale_document_id')->nullable();
++            $table->unsignedBigInteger('cancel_document_id')->nullable();
++            $table->timestampTz('overdue_at')->nullable();
++            $table->timestampTz('closed_at')->nullable();
++            $table->unsignedSmallInteger('extended_count')->default(0);
++            $table->text('comment')->nullable();
++            $table->timestampsTz();
++            $table->index(['organization_id', 'status', 'hold_until']);
++            $table->index(['organization_id', 'variant_id', 'status']);
++        });
++        DB::statement("ALTER TABLE orders ADD CONSTRAINT orders_check CHECK (kind IN ('unit','variant') AND status IN ('draft','active','overdue','sold','cancelled','expired')
++            AND price > 0 AND prepayment >= 0 AND prepayment <= price AND (kind = 'variant' OR stock_unit_id IS NOT NULL) AND (prepayment = 0 OR prepayment_account_id IS NOT NULL))");
++        foreach (['customer_id' => 'customers', 'stock_unit_id' => 'stock_units', 'prepayment_account_id' => 'money_accounts', 'sale_document_id' => 'documents', 'cancel_document_id' => 'documents'] as $column => $referenced) {
++            DB::statement("ALTER TABLE orders ADD CONSTRAINT orders_{$column}_same_org_fk
++                FOREIGN KEY (organization_id, {$column}) REFERENCES {$referenced} (organization_id, id) ON DELETE RESTRICT");
++        }
++        DB::unprepared("CREATE TRIGGER orders_posted_guard BEFORE INSERT OR UPDATE OR DELETE ON orders FOR EACH ROW EXECUTE FUNCTION pm_posted_detail_guard('status', 'hold_until', 'stock_unit_id', 'sale_document_id', 'cancel_document_id', 'overdue_at', 'closed_at', 'extended_count', 'comment')");
++
++        Schema::create('order_cancellations', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->foreignId('document_id')->unique()->constrained()->cascadeOnDelete();
++            $table->unsignedBigInteger('order_document_id');
++            $table->bigInteger('refund')->default(0);
++            $table->unsignedBigInteger('refund_account_id')->nullable();
++            $table->text('reason')->nullable();
++            $table->timestampsTz();
++        });
++        DB::statement('ALTER TABLE order_cancellations ADD CONSTRAINT order_cancellations_check CHECK (refund >= 0 AND (refund = 0 OR refund_account_id IS NOT NULL))');
++        foreach (['order_document_id' => 'documents', 'refund_account_id' => 'money_accounts'] as $column => $referenced) {
++            DB::statement("ALTER TABLE order_cancellations ADD CONSTRAINT order_cancellations_{$column}_same_org_fk
++                FOREIGN KEY (organization_id, {$column}) REFERENCES {$referenced} (organization_id, id) ON DELETE RESTRICT");
++        }
++        DB::unprepared('CREATE TRIGGER order_cancellations_posted_guard BEFORE INSERT OR UPDATE OR DELETE ON order_cancellations FOR EACH ROW EXECUTE FUNCTION pm_posted_detail_guard()');
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('order_cancellations');
++        Schema::dropIfExists('orders');
++    }
++};
+diff --git a/prime-mobile-os/database/migrations/2026_11_10_110700_audit_create_reconciliation_runs.php b/prime-mobile-os/database/migrations/2026_11_10_110700_audit_create_reconciliation_runs.php
+new file mode 100644
+index 0000000..bd36981
+--- /dev/null
++++ b/prime-mobile-os/database/migrations/2026_11_10_110700_audit_create_reconciliation_runs.php
+@@ -0,0 +1,38 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Nightly reconciliation runs (TZ 02 §11.5, §13): result, discrepancies, owner lists (§13.2 №15–17) and the heads
++ * of the hash chains (last chain_seq + hash per journal) — a deleted «tail» of a journal is caught by comparing
++ * with the previous run (CORE.md §12 «Осталось»).
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('reconciliation_runs', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
++            $table->date('business_date');                     // night of (organization timezone)
++            $table->timestampTz('started_at');
++            $table->timestampTz('finished_at')->nullable();
++            $table->boolean('ok')->default(false);
++            $table->jsonb('problems')->nullable();             // list of strings
++            $table->jsonb('lists')->nullable();                // informational lists for the owner
++            $table->jsonb('chain_heads')->nullable();          // journal => {seq, hash}
++            $table->foreignId('resolved_by')->nullable()->constrained('users')->restrictOnDelete();
++            $table->timestampTz('resolved_at')->nullable();
++            $table->text('comment')->nullable();
++            $table->timestampsTz();
++            $table->index(['organization_id', 'business_date']);
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('reconciliation_runs');
++    }
++};
+-- 
+2.43.0
+
