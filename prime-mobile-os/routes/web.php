@@ -1,13 +1,12 @@
 <?php
 
-use App\Http\Controllers\Tenancy\OrganizationSwitchController;
+use App\Support\Routing\ModuleRoutes;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
+// One system, two addresses (TZ 05 §1): the ERP answers on config('prime.erp_domain') (Filament panel with an
+// empty path), the storefront on config('prime.shop_domain'). Module routes: routes/modules/<slug>.php.
+ModuleRoutes::storefront(function () {
+    Route::get('/', fn () => view('welcome'))->name('home');
 });
 
-Route::middleware(['web', 'auth', 'organization'])->group(function () {
-    Route::get('/organization/select', [OrganizationSwitchController::class, 'select'])->name('organization.select');
-    Route::post('/organization/switch/{organization}', [OrganizationSwitchController::class, 'switch'])->whereNumber('organization')->name('organization.switch');
-});
+ModuleRoutes::load();

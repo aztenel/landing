@@ -10,7 +10,8 @@ use InvalidArgumentException;
  */
 final class OrganizationSettings
 {
-    public const ACCENTS = ['blue', 'graphite'];
+    /** blue #2A4BD7 (default), graphite + 4 contrast-checked variants (TZ 04 Э26, App\Support\Ui\Accent). */
+    public const ACCENTS = ['blue', 'graphite', 'navy', 'teal', 'violet', 'plum'];
 
     public const DEFAULTS = [
         'accent' => 'blue',                               // blue #2A4BD7 | graphite
@@ -48,6 +49,59 @@ final class OrganizationSettings
         ],
         'approvals' => [
             'confirm_threshold' => 30000000,              // tiyn (300 000 ₸), PIN before «Разрешить»
+            'deciders' => 'owner_then_admin',             // owner | owner_then_admin (TZ 04 Э25.3)
+            'admin_after_minutes' => 5,
+        ],
+        // ---- module «shell», settings screen Э26 (TZ 04) ----
+        'brand' => [
+            'display_name' => null,                       // name for customers; null = organizations.name
+            'logo_light' => null,                         // storage path (public disk)
+            'logo_dark' => null,
+        ],
+        'rules' => [
+            'used_to_preparation' => true,                // б/у сначала на подготовку
+            'customer_debt_cap' => 30000000,              // tiyn (300 000 ₸) — firm ceiling per customer
+            'debt_default_days' => 30,
+            'accessories_negative' => false,              // продажа «в минус» по аксессуарам
+            'customer_required_cashless' => false,
+            'low_stock_threshold' => 2,                   // «заканчивается»
+            'aging_buckets' => [30, 60, 90],              // «залежался» 0–30 / 31–60 / 61–90 / 90+
+            'aging_threshold_days' => 30,
+            'buy_usd_from_customers' => false,            // TZ 01 П18.3 — off
+            'buy_usd_discount' => 300,                    // tiyn per $1 (курс дня − 3 ₸)
+        ],
+        'warranty' => [
+            'new_months' => 12,
+            'used_months' => 1,
+            'accessory_months' => 1,
+        ],
+        'texts' => [
+            'warranty_ru' => null, 'warranty_kk' => null,
+            'consent_ru' => null, 'consent_kk' => null, 'consent_version' => 1, 'consent_date' => null,
+            'tradein_act' => null, 'return_terms' => null, 'receipt_footer' => null,
+            'staff_rules' => null, 'staff_rules_version' => 1,
+        ],
+        'printing' => [
+            'receipt_width' => 80,                        // 58 | 80 mm
+            'warranty_format' => 'a4',                    // a4 | tape
+            'label_size' => '58x40',
+            'label_fields' => ['model', 'memory', 'price', 'imei_barcode'],
+            'language' => 'kk+ru',                        // kk+ru | ru | kk
+        ],
+        'dictionaries' => [
+            'customer_sources' => ['Instagram', 'WhatsApp', '2ГИС', 'Kaspi', 'Рекомендация', 'Проходил мимо'],
+            'delivery_services' => ['Яндекс Доставка', 'Курьер магазина', 'Kaspi Доставка'],
+            'discount_reasons' => ['Постоянный клиент', 'Царапина на корпусе', 'Акция'],
+            'write_off_reasons' => ['Брак', 'Разбит', 'Утерян'],
+        ],
+        'notifications' => [
+            'summary_time' => '09:00',
+            'events' => [],                               // event => {owner_push, owner_telegram, admin_push, admin_telegram}
+        ],
+        'security' => [
+            'lock_store_computer' => 10,                  // minutes, TZ 03 §9
+            'lock_iphone' => 5,
+            'lock_laptop' => 15,
         ],
     ];
 
@@ -55,10 +109,24 @@ final class OrganizationSettings
 
     public function __construct(array $stored = [])
     {
-        $this->data = array_replace_recursive(self::DEFAULTS, $stored);
+        $this->data = self::merge(self::DEFAULTS, $stored);
         if (! in_array($this->data['accent'], self::ACCENTS, true)) {
             throw new InvalidArgumentException("Unknown accent «{$this->data['accent']}».");
         }
+    }
+
+    /** Stored values override defaults key by key; a stored list replaces the default list as a whole. */
+    private static function merge(array $defaults, array $stored): array
+    {
+        foreach ($stored as $key => $value) {
+            if (is_array($value) && isset($defaults[$key]) && is_array($defaults[$key]) && $defaults[$key] !== [] && ! array_is_list($defaults[$key])) {
+                $defaults[$key] = self::merge($defaults[$key], $value);
+            } else {
+                $defaults[$key] = $value;
+            }
+        }
+
+        return $defaults;
     }
 
     public function get(string $key, mixed $default = null): mixed
