@@ -45,4 +45,8 @@ git checkout claude/nifty-johnson-nwlyrg
 3. Запустить Workflow со сценарием `plan/prime-module-round.js` и `args` из `round-RN.json`.
 4. После раунда: проверить слияние, `php artisan test`, запушить.
 
+**Важно после аудита (10.11.2026).** Ядро изменилось (см. `prime-mobile-os/docs/CORE.md` §14). При продолжении раунда 1:
+- `approvals`: смены (`shifts` на магазин, `Shifts`, `ShiftGuard`, `documents.shift_id`), `reconciliation_runs` и команда ночной сверки, тип документа РКС вместо `shift_close` — уже в ядре; миграции WIP с теми же таблицами убрать, логику построить поверх ядра.
+- `shell`: доступ к магазинам — `membership_stores` с галочками «Продажи»/«Финансы»; права просмотра бухгалтера — отдельные (`*.view`).
+
 Когда раунд 1 будет слит, папку `docs/wip/` можно удалить.
