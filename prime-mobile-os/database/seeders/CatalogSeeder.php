@@ -108,6 +108,11 @@ class CatalogSeeder extends Seeder
             }
         }
 
+    }
+
+    /** Starter accessories of the CURRENT firm (accessories belong to a firm, audit №9). */
+    public static function accessoriesForCurrentOrganization(): void
+    {
         $sort = 0;
         foreach (self::ACCESSORIES as $sku => [$category, $ru, $kk, $barcode]) {
             $cat = AccessoryCategory::query()->firstOrCreate(['name_ru' => $category], ['sort' => $sort += 10]);

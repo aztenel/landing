@@ -97,3 +97,18 @@ it('selects the organization of the request in the middleware', function () {
     $stranger = User::factory()->create();
     $this->actingAs($stranger)->withSession([SetCurrentOrganization::SESSION_KEY => $a->org->id])->get('/_test/org')->assertForbidden();
 });
+
+it('keeps accessories per firm: another firm does not see them and may reuse the article and barcode (audit №9)', function () {
+    $a = world();
+    $caseOfA = $a->case;
+    $b = world(name: 'Другая фирма');   // switches the current organization to B
+
+    expect(\App\Domain\Catalog\Models\Accessory::query()->whereKey($caseOfA->id)->exists())->toBeFalse()
+        ->and($b->case->id)->not->toBe($caseOfA->id)
+        ->and($b->case->barcode)->toBe($caseOfA->barcode);
+
+    // B cannot sell A's accessory: stock rows of B may not point to it
+    expect(fn () => \Illuminate\Support\Facades\DB::transaction(fn () => \Illuminate\Support\Facades\DB::table('accessory_costs')->insert([
+        'organization_id' => $b->org->id, 'accessory_id' => $caseOfA->id, 'total_qty' => 0, 'avg_cost_kzt' => 0, 'updated_at' => now(),
+    ])))->toThrow(\Illuminate\Database\QueryException::class);
+});

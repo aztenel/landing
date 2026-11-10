@@ -150,6 +150,7 @@ class PrimeMobileSeeder extends Seeder
 
         CurrentOrganization::instance()->run($this->org, function () {
             $this->store = Store::query()->firstOrFail();
+            CatalogSeeder::accessoriesForCurrentOrganization();
             $this->configurePaymentMethods();
             $this->directories();
             $this->rates();

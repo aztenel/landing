@@ -82,23 +82,34 @@ return new class extends Migration
         });
         DB::statement('CREATE UNIQUE INDEX variants_combination_unique ON variants (model_id, memory_id, color_id, ram_id) NULLS NOT DISTINCT');
 
+        // accessories and their categories belong to a firm (audit №9); only phone models are shared (Д1)
         Schema::create('accessory_categories', function (Blueprint $table) {
             $table->id();
-            $table->string('name_ru')->unique();
+            $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
+            $table->string('name_ru');
             $table->string('name_kk')->nullable();
+            $table->unsignedSmallInteger('warranty_months')->nullable();   // overrides the firm default (audit №32)
             $table->unsignedSmallInteger('sort')->default(0);
             $table->timestampsTz();
+            $table->unique(['organization_id', 'name_ru']);
+            $table->unique(['organization_id', 'id']);
         });
 
         Schema::create('accessories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('category_id')->nullable()->constrained('accessory_categories')->nullOnDelete();
-            $table->string('sku', 64)->unique();           // артикул
-            $table->string('barcode', 64)->nullable()->unique();
+            $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
+            $table->unsignedBigInteger('category_id')->nullable();
+            $table->string('sku', 64);                     // артикул
+            $table->string('barcode', 64)->nullable();
             $table->string('name_ru');
             $table->string('name_kk')->nullable();
+            $table->unsignedSmallInteger('warranty_months')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestampsTz();
+            $table->unique(['organization_id', 'sku']);
+            $table->unique(['organization_id', 'barcode']);
+            $table->unique(['organization_id', 'id']);
+            $table->foreign(['organization_id', 'category_id'])->references(['organization_id', 'id'])->on('accessory_categories')->restrictOnDelete();
         });
 
         Schema::create('variant_prices', function (Blueprint $table) {
@@ -119,6 +130,7 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestampsTz();
             $table->unique(['organization_id', 'accessory_id']);
+            $table->foreign(['organization_id', 'accessory_id'], 'accessory_prices_same_org_fk')->references(['organization_id', 'id'])->on('accessories')->cascadeOnDelete();
         });
 
         DB::statement('ALTER TABLE variant_prices ADD CONSTRAINT variant_prices_positive CHECK (price_kzt >= 0)');
