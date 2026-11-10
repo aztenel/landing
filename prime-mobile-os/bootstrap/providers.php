@@ -6,4 +6,5 @@ return [
     App\Domain\Ledger\LedgerServiceProvider::class,
     App\Providers\Filament\AdminPanelProvider::class,
     App\Providers\ShellServiceProvider::class,
+    App\Domain\Approvals\ApprovalsServiceProvider::class,
 ];

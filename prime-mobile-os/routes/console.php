@@ -16,3 +16,6 @@ Schedule::command('prime:reconcile')->dailyAt('03:30')->timezone('Asia/Almaty')-
 
 // Expired cart reservations (audit №51)
 Schedule::command('prime:release-reservations')->everyMinute()->withoutOverlapping();
+
+// Approval requests: expiry, escalation to the admin, repeated push (TZ 03 §6.4)
+Schedule::command('prime:approvals-tick')->everyMinute()->withoutOverlapping();
