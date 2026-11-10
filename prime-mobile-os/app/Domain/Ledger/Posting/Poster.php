@@ -48,6 +48,19 @@ class Poster
         private readonly ApprovalGate $approvals,
     ) {}
 
+    /**
+     * Several documents as ONE operation (audit №20): exchange (return + new sale), trade-in act + sale. Either all of
+     * them are posted or none: one outer transaction, each document posted in it in the given order (the act / the
+     * return first). A deadlock retries the whole group.
+     *
+     * @param  list<Document>  $documents
+     * @return list<Document>
+     */
+    public function postMany(array $documents, User $actor): array
+    {
+        return TransactionRetry::run(fn () => array_map(fn (Document $d) => $this->post($d, $actor), $documents));
+    }
+
     public function post(Document $document, User $actor): Document
     {
         $organization = CurrentOrganization::instance()->require();

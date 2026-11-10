@@ -54,6 +54,18 @@ class Reverser
         private readonly BonusLedger $bonuses,
     ) {}
 
+    /**
+     * Reverse several documents as one operation (audit №20, №40: «Сторно продажи и акта»), in the given order
+     * (the later document first). All or nothing.
+     *
+     * @param  list<Document>  $documents
+     * @return list<Document>
+     */
+    public function reverseMany(array $documents, ReversalReason|string $reason, ?string $reasonText, User $actor): array
+    {
+        return TransactionRetry::run(fn () => array_map(fn (Document $d) => $this->reverse($d, $reason, $reasonText, $actor), $documents));
+    }
+
     public function reverse(Document $original, ReversalReason|string $reason, ?string $reasonText, User $actor): Document
     {
         $organization = CurrentOrganization::instance()->require();

@@ -39,3 +39,21 @@ it('does not need a shift for a non-cash expense, but does for a cash one', func
     expect(fn () => ExpenseDraft::make('rent', $w->store)->pay($w->account('cash_kzt'), Money::kzt(10000))->post($w->owner))
         ->toThrow(PostingException::class, 'Смена не открыта');
 });
+
+it('posts and reverses several documents as one operation: all or nothing (audit №20)', function () {
+    $w = world();
+    $poster = app(\App\Domain\Ledger\Posting\Poster::class);
+    $a = SaleDraft::make($w->store, $w->seller)->unit($w->phone(), Money::kzt(900000))->cash(Money::kzt(900000))->save();
+    $broken = SaleDraft::make($w->store, $w->seller)->unit($w->phone(), Money::kzt(900000))->cash(Money::kzt(1))->save();
+
+    expect(fn () => $poster->postMany([$a, $broken], $w->owner))->toThrow(PostingException::class);
+    expect($a->refresh()->isDraft())->toBeTrue()->and($broken->refresh()->isDraft())->toBeTrue();
+
+    $b = SaleDraft::make($w->store, $w->seller)->unit($w->phone(), Money::kzt(900000))->cash(Money::kzt(900000))->save();
+    [$pa, $pb] = $poster->postMany([$a, $b], $w->owner);
+    expect($pa->isPosted())->toBeTrue()->and($pb->isPosted())->toBeTrue();
+
+    app(Reverser::class)->reverseMany([$pb, $pa], 'duplicate', null, $w->owner);
+    expect($pa->refresh()->status->value)->toBe('reversed')->and($pb->refresh()->status->value)->toBe('reversed')
+        ->and(Reconciliation::problems())->toBe([]);
+});
