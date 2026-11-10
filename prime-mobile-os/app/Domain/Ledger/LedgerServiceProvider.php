@@ -38,6 +38,7 @@ class LedgerServiceProvider extends ServiceProvider
         'debt_adjustment' => \App\Domain\Debts\Posting\DebtAdjustmentHandler::class,
         'bonus_manual' => \App\Domain\Loyalty\Posting\BonusManualHandler::class,
         'bonus_expire' => \App\Domain\Loyalty\Posting\BonusExpireHandler::class,
+        'order' => \App\Domain\Orders\Posting\OrderHandler::class,
         'sale' => SaleHandler::class,
         'customer_return' => CustomerReturnHandler::class,
         'expense' => ExpenseHandler::class,

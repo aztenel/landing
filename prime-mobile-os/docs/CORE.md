@@ -561,4 +561,22 @@ App\Support\DocumentNumber\DocumentNumber::format('ПРД', 2026, 12), ::parse()
 - Ночная сверка в рабочей системе: `prime:reconcile` (03:30 Алматы), результат — `reconciliation_runs` (№16). Класс — `App\Domain\Ledger\Services\Reconciliation`.
 - Журнал действий — только добавление (триггер, №14). В журналы можно добавлять только колонки `NULL` без значения по умолчанию — иначе ломается хэш-цепочка; тест `JournalHashColumnsTest` (№15).
 
-**Передано модулям (правило записано в decisions.md):** ВДП-обработчик и возврат по продажам из sfon (№3, модуль чеков/возвратов); бонусы на погашенный долг и `BonusLedger::expire()` с системным документом БСГ (№25, №54, модуль бонусов); план возврата денег по способам (№26, модуль возвратов); заявка к смене цены и ссылка заявки у сторно (№53, модуль заявок); подсчёт кассы и РКС, инкассация (№28, №57, модуль денег); сетка выкупа и акт trade-in (№29, №40).
+**Передано модулям (правило записано в decisions.md):** ВДП-обработчик и возврат по продажам из sfon (№3, модуль чеков/возвратов); план возврата денег по способам (№26, модуль возвратов); заявка к смене цены и ссылка заявки у сторно (№53, модуль заявок); сетка выкупа и акт trade-in (№29, №40).
+
+## 15. Документы раунда 1 (10.11.2026)
+
+| Документ | Черновик | Обработчик | Смена |
+|---|---|---|---|
+| Движение денег ДДС | `Money\Drafts\CashMoveDraft` (deposit, withdrawal, transfer, collection, acceptCollection) | `Money\Posting\CashMoveHandler` | если наличные магазина |
+| Расхождение кассы РКС | `Money\Drafts\CashAdjustmentDraft` (вручную: `money.adjust`, L16) | `Money\Posting\CashAdjustmentHandler` | не нужна |
+| Корректировка долга КДЛ | `Debts\Drafts\DebtAdjustmentDraft` (forgive, increase, postpone) | `Debts\Posting\DebtAdjustmentHandler` | не нужна |
+| Бонусы вручную БНС | `Loyalty\Drafts\BonusManualDraft` (give, take) | `Loyalty\Posting\BonusManualHandler` | не нужна |
+| Сгорание бонусов БСГ | только `Loyalty\Services\BonusExpiry` (ночью) | `Loyalty\Posting\BonusExpireHandler`, не сторнируется | не нужна |
+| Заказ ЗАК | `Orders\Drafts\OrderDraft` (unit, variant, prepay) | `Orders\Posting\OrderHandler` | с предоплатой — нужна |
+
+- **Смена с пересчётом:** `Money\Services\ShiftCash::open($store, $user, [account_id => сумма])` и `close($shift, …)` — сумма в тиынах/центах по каждой кассе магазина, расхождение → РКС на каждую кассу; `Shifts` ядра без пересчёта остаётся для ночного автозакрытия.
+- **Системный документ:** `Poster::postAsSystem()` — только типы `Poster::SYSTEM_TYPES` с `meta.system = true`; в журнале действий — «система».
+- **Обработчик может сам решать, кто отменяет документ:** метод `authorizeReversal(Document, PostingContext): bool` (заказ — его продавец или `order.cancel_any`); иначе — `doc.reverse` с L18. Проверка «после документа были другие» смотрит только телефоны, которые документ двигал.
+- **Бонусы на долг:** `Loyalty\Services\DebtBonusAccrual` вызывает оплата долга клиента; разнесение — `debt_payment_allocations`; возврат отменяет и эти бонусы.
+- **Заказы:** `Orders\Services\Orders::extend()`, `attachUnit()`, `tick()`; продажа по заказу — `SaleDraft::fromOrder($orderDocId)` + оплата `prepayment`.
+- **Расписание:** `prime:shifts-tick` (каждую минуту), `prime:orders-tick` (5 мин), `prime:bonus-expire` (03:10), `prime:reconcile` (03:30).

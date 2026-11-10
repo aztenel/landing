@@ -116,9 +116,11 @@ class Reverser
             $ctx = new PostingContext($reversal, $actor, $organization, $now, $this->access, $this->approvals, isReversal: true);
             $tz = $organization->timezone; // L18 counts calendar days of the organization, not of UTC
             $days = (int) abs(CarbonImmutable::parse($orig->posted_at)->setTimezone($tz)->startOfDay()->diffInDays($now->setTimezone($tz)->startOfDay()));
-            $ctx->authorize('doc.reverse', Limit::ReversalDays, $days, 'reversal');
-
             $handler = $this->handlers->for($orig->type);
+            // a handler may own the right to cancel its document (an order: its seller or order.cancel_any)
+            if (! (method_exists($handler, 'authorizeReversal') && $handler->authorizeReversal($orig, $ctx))) {
+                $ctx->authorize('doc.reverse', Limit::ReversalDays, $days, 'reversal');
+            }
             $handler->assertReversible($orig, $ctx);
 
             $movements = InventoryMovement::query()->where('document_id', $orig->id)->orderByDesc('id')->get();
@@ -141,7 +143,12 @@ class Reverser
 
             // rule 2.1 p.4: the unit must not have changed after this document. «Live» movements only: a document
             // that was itself reversed (and its reversal) no longer counts.
+            // (units the handler only locks for its own needs, e.g. the phone held by an order, are not checked)
+            $moved = $movements->pluck('stock_unit_id')->filter()->map(fn ($id) => (int) $id)->all();
             foreach ($ctx->locks->units() as $unit) {
+                if (! in_array((int) $unit->id, $moved, true)) {
+                    continue;
+                }
                 $last = InventoryMovement::query()
                     ->where('stock_unit_id', $unit->id)
                     ->whereNull('reversal_of_entry_id')

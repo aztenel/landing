@@ -25,3 +25,6 @@ Schedule::command('prime:approvals-tick')->everyMinute()->withoutOverlapping();
 
 // Unclosed shifts: «Касса не закрыта» to the owner at 23:59, auto close «не сверена» at 03:00 (audit №57)
 Schedule::command('prime:shifts-tick')->everyMinute()->withoutOverlapping();
+
+// Orders: a hold without prepayment expires, with prepayment becomes «Просрочен» (TZ 01 П10.2)
+Schedule::command('prime:orders-tick')->everyFiveMinutes()->withoutOverlapping();

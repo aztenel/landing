@@ -2,6 +2,7 @@
 
 namespace App\Domain\Sales\Posting;
 
+use App\Domain\Orders\Models\Order;
 use App\Domain\Counterparties\Enums\CounterpartyType;
 use App\Domain\Catalog\Models\AccessoryPrice;
 use App\Domain\Catalog\Models\VariantPrice;
@@ -11,6 +12,7 @@ use App\Domain\Inventory\Enums\UnitAction;
 use App\Domain\Inventory\Enums\UnitStatus;
 use App\Domain\Inventory\Location;
 use App\Domain\Inventory\Models\StockUnit;
+use App\Domain\Inventory\UnitTransitions;
 use App\Domain\Inventory\Models\UnitReservation;
 use App\Domain\Ledger\Enums\BonusKind;
 use App\Domain\Ledger\Enums\DebtKind;
@@ -229,6 +231,8 @@ class SaleHandler extends AbstractDocumentHandler
         foreach ($lines->whereNotNull('stock_unit_id') as $line) {
             $this->assertSellable($ctx, $ctx->locks->unit((int) $line->stock_unit_id), $sale, $storeId);
         }
+        // «Продать по заказу» (TZ 01 П10.2 p.6): the open order of this customer, its phone / variant in the check
+        $this->order = $sale->order_document_id ? $this->openOrder($ctx, $sale, $lines) : null;
 
         // 2. costs at posting time
         $costs = [];
@@ -396,6 +400,41 @@ class SaleHandler extends AbstractDocumentHandler
             ])->save();
         }
         $sale->forceFill(['subtotal' => $subtotal, 'discount_total' => $discountTotal, 'total' => $total])->save();
+        $this->order?->forceFill(['status' => 'sold', 'sale_document_id' => $document->id, 'closed_at' => $ctx->now])->save();
+        $this->order = null;
+    }
+
+    private ?Order $order = null;
+
+    private function openOrder(PostingContext $ctx, Sale $sale, Collection $lines): Order
+    {
+        $order = Order::query()->where('document_id', $sale->order_document_id)->lockForUpdate()->first();
+        if (! $order || ! $order->isOpen()) {
+            throw PostingException::because('order_not_open', 'Заказ уже продан, отменён или не проведён');
+        }
+        if ((int) $order->customer_id !== (int) $sale->customer_id) {
+            throw PostingException::because('order_other_customer', 'Заказ оформлен на другого клиента');
+        }
+        $units = $lines->whereNotNull('stock_unit_id')->map(fn ($l) => $ctx->locks->unit((int) $l->stock_unit_id));
+        $matches = $order->stock_unit_id
+            ? $units->contains(fn ($u) => (int) $u->id === (int) $order->stock_unit_id)
+            : $units->contains(fn ($u) => (int) $u->variant_id === (int) $order->variant_id);
+        if (! $matches) {
+            throw PostingException::because('order_unit_missing', 'В чеке нет телефона по этому заказу');
+        }
+
+        return $order;
+    }
+
+    /** The phone of the order sells at the order price, or at today's price if it fell (TZ 01 П10.2, «Цена изменилась»). */
+    private function orderPrice(StockUnit $unit, ?int $list): ?int
+    {
+        $o = $this->order;
+        if (! $o || ($o->stock_unit_id ? (int) $o->stock_unit_id !== (int) $unit->id : (int) $o->variant_id !== (int) $unit->variant_id)) {
+            return $list;
+        }
+
+        return $list === null ? (int) $o->price : min($list, (int) $o->price);
     }
 
     // ------------------------------------------------------------------ reversal hooks
@@ -416,6 +455,21 @@ class SaleHandler extends AbstractDocumentHandler
     {
         foreach ($this->lines($original) as $line) {
             $line->forceFill(['is_active' => false])->save();
+        }
+        // the order comes back open, its phone held by it again
+        $order = Order::query()->where('sale_document_id', $original->id)->lockForUpdate()->first();
+        if ($order) {
+            $late = $order->hold_until->lt($ctx->now);
+            $order->forceFill([
+                'status' => $late && $order->prepayment > 0 ? 'overdue' : 'active', 'sale_document_id' => null, 'closed_at' => null,
+                'hold_until' => $late && $order->prepayment === 0 ? $ctx->now->addDay() : $order->hold_until,
+            ])->save();
+            // the reversal puts the phone back «в наличии» (a hold is never restored blindly): the order takes it again
+            $unit = $order->stock_unit_id ? StockUnit::query()->whereKey($order->stock_unit_id)->lockForUpdate()->first() : null;
+            if ($unit && $unit->status === UnitStatus::InStock) {
+                UnitTransitions::assert(UnitStatus::InStock, UnitStatus::Ordered, UnitAction::Order);
+                $unit->forceFill(['status' => UnitStatus::Ordered->value, 'order_document_id' => $order->document_id])->save();
+            }
         }
     }
 
@@ -534,9 +588,10 @@ class SaleHandler extends AbstractDocumentHandler
         if ($line->stock_unit_id) {
             $unit = $ctx->locks->unit((int) $line->stock_unit_id);
             $price = $unit->sale_price ?? VariantPrice::query()->where('variant_id', $unit->variant_id)->value('price_kzt');
-        } else {
-            $price = AccessoryPrice::query()->where('accessory_id', $line->accessory_id)->value('price_kzt');
+
+            return $this->orderPrice($unit, $price === null ? null : (int) $price);
         }
+        $price = AccessoryPrice::query()->where('accessory_id', $line->accessory_id)->value('price_kzt');
 
         return $price === null ? null : (int) $price;
     }
