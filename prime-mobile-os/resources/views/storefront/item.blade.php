@@ -11,7 +11,7 @@
             <p class="mt-1 text-[15px] {{ $a->availability === 'in_stock' ? 'text-ok' : 'text-warn' }}">{{ Site::t($a->availability === 'in_stock' ? 'В наличии' : 'Под заказ') }}</p>
             <a href="{{ Site::route('wa', ['t' => 'ask', 'code' => $a->public_code]) }}" rel="nofollow" class="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-wa text-white font-semibold h-12">@include('storefront.partials.wa-icon', ['class' => 'w-5 h-5']){{ Site::t('Написать в WhatsApp') }}</a>
         </div>
-        @if ($store)@include('storefront.partials.store', ['s' => $store])@endif
+        @if ($store)@include('storefront.partials.store', ['s' => $store, 'stack' => true])@endif
     </div>
 </div>
 @endsection

@@ -1,5 +1,6 @@
 @php use App\Http\Storefront\Site; use App\Support\Ui\Icon; @endphp
-<section class="bg-white rounded-2xl border border-border p-5 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+{{-- $stack: a narrow column (phone / item card) — the buttons go under the address instead of beside it --}}
+<section class="bg-white rounded-2xl border border-border p-5 grid gap-3 {{ ($stack ?? false) ? '' : 'sm:grid-cols-[1fr_auto] sm:items-center' }}">
     <div class="min-w-0">
         <h2 class="text-[18px] font-bold">{{ $s->name }}</h2>
         <p class="mt-1 flex items-start gap-1.5 text-[15px]">{!! Icon::svg('pin', 'w-5 h-5 shrink-0 mt-0.5 text-muted-foreground') !!}{{ Site::$lang === 'kk' && $s->address_kk ? $s->address_kk : $s->address_ru }}</p>

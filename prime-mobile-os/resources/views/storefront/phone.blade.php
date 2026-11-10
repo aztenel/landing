@@ -139,7 +139,7 @@
                 </div>
             @endif
 
-            @if ($store)@include('storefront.partials.store', ['s' => $store])@endif
+            @if ($store)@include('storefront.partials.store', ['s' => $store, 'stack' => true])@endif
             <div class="grid grid-cols-2 gap-2 text-[14px]">
                 <a href="{{ Site::route('page', ['slug' => 'garantiya']) }}" class="bg-white rounded-xl border border-border px-4 py-3 font-medium">{{ Site::t('Гарантия, обмен и возврат') }}</a>
                 <a href="{{ Site::route('tradein', ['want' => $sold ? null : $l->public_code]) }}" class="bg-white rounded-xl border border-border px-4 py-3 font-medium">Trade-in: {{ mb_strtolower(Site::t('Сдайте старый телефон в зачёт')) }}</a>
