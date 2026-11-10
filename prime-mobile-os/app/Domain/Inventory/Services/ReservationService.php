@@ -35,6 +35,13 @@ class ReservationService
             $locked = StockUnit::query()->whereKey($unit instanceof StockUnit ? $unit->id : $unit)->lockForUpdate()->firstOrFail();
             $active = UnitReservation::query()->where('stock_unit_id', $locked->id)->whereNull('released_at')->first();
 
+            // somebody else's cart that already expired does not hold the phone (audit №51, TZ 07 scenario 16)
+            if ($locked->status === UnitStatus::Reserved && $active && (int) $active->user_id !== $user->id && $active->expires_at->isPast()) {
+                $active->forceFill(['released_at' => now(), 'release_reason' => 'expired'])->save();
+                $locked->forceFill(['status' => UnitStatus::InStock->value])->save();
+                Outbox::record('unit.changed', ['stock_unit_id' => $locked->id, 'action' => 'release', 'status' => UnitStatus::InStock->value], 'stock_unit', $locked->id);
+                $active = null;
+            }
             if ($locked->status === UnitStatus::Reserved && $active) {
                 if ((int) $active->user_id !== $user->id) {
                     throw PostingException::because('unit_reserved', "Уже в корзине у {$active->user?->name} до ".$active->expires_at->setTimezone(CurrentOrganization::instance()->require()->timezone)->format('H:i'));
@@ -67,6 +74,9 @@ class ReservationService
             $fresh = UnitReservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
             if ($fresh->released_at !== null) {
                 return;
+            }
+            if ($reason === 'expired' && $fresh->expires_at->isFuture()) {
+                return; // renewed by its owner in the meantime (audit №51: the expiry job must not drop a live cart)
             }
             $fresh->forceFill(['released_at' => now(), 'release_reason' => $reason])->save();
             if ($unit->status === UnitStatus::Reserved) {

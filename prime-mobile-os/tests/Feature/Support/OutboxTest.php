@@ -80,3 +80,23 @@ it('runs the nightly ledger checks in production and stores the result (audit â„
     $this->artisan('prime:reconcile', ['--organization' => $w->org->id])->assertFailed();
     expect(DB::table('reconciliation_runs')->where('organization_id', $w->org->id)->latest('id')->value('ok'))->toBeFalse();
 });
+
+it('lets another seller take a phone whose cart reservation expired; the expiry job does not drop a renewed cart (audit â„–51)', function () {
+    $w = world();
+    $unit = $w->phone();
+    $service = app(ReservationService::class);
+    $service->reserve($unit, $w->seller);
+
+    $this->travel(31)->minutes();
+    $taken = $service->reserve($unit, $w->admin);
+    expect((int) $taken->user_id)->toBe($w->admin->id);
+
+    // the admin renews the cart; a job that read the old row must not release it
+    $this->travel(31)->minutes();
+    $stale = \App\Domain\Inventory\Models\UnitReservation::query()->find($taken->id);
+    $service->reserve($unit, $w->admin);
+    $service->release($stale, null, 'expired');
+    expect(\App\Domain\Inventory\Models\UnitReservation::query()->find($taken->id)->released_at)->toBeNull();
+
+    $this->artisan('prime:release-reservations')->assertSuccessful();
+});

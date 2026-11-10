@@ -13,3 +13,6 @@ Schedule::command('prime:outbox')->everyMinute()->withoutOverlapping();
 
 // Nightly ledger checks in production (audit №16, TZ 02 §13)
 Schedule::command('prime:reconcile')->dailyAt('03:30')->timezone('Asia/Almaty')->withoutOverlapping();
+
+// Expired cart reservations (audit №51)
+Schedule::command('prime:release-reservations')->everyMinute()->withoutOverlapping();
