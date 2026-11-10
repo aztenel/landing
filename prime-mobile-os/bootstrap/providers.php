@@ -7,4 +7,5 @@ return [
     App\Providers\Filament\AdminPanelProvider::class,
     App\Providers\ShellServiceProvider::class,
     App\Domain\Approvals\ApprovalsServiceProvider::class,
+    App\Domain\Pos\PosServiceProvider::class,
 ];

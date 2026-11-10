@@ -77,6 +77,12 @@ final class Shell
         $count = $stores->count();
         $label = trans_choice(':count магазин|:count магазина|:count магазинов', $count, ['count' => $count]);
 
+        // the store this person works in (cash register, shift) comes first, like on the mockup «ТРЦ «Керуен» · Смена с 09:00»
+        $working = ($user = self::user()) ? WorkingStore::get($user) : null;
+        if ($working && $count > 1 || $working && ! self::role()?->is_owner) {
+            return [$working->name, $org->settings()->get('brand.display_name') ?: $org->name];
+        }
+
         return [$org->settings()->get('brand.display_name') ?: $org->name, trim($first.' · '.$label, ' ·')];
     }
 

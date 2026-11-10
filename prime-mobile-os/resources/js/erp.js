@@ -337,6 +337,23 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // cash register: «Автодобавление 0,8 с» remembered on the device (TZ 04 Э3, Э3.8)
+    Alpine.data('pmPos', () => ({
+        auto: true,
+        init() {
+            try { this.auto = localStorage.getItem('pm.pos.auto') !== '0'; } catch (e) { /* ignore */ }
+        },
+        saveAuto() {
+            try { localStorage.setItem('pm.pos.auto', this.auto ? '1' : '0'); } catch (e) { /* ignore */ }
+        },
+        // Enter in the scan field: the code goes to the cart, the field is cleared for the next one
+        submitScan(el) {
+            const code = el.value.trim();
+            el.value = '';
+            if (code) this.$wire.scan(code);
+        },
+    }));
+
     // Chrome ≤ 109 (Windows 7): offer «старый ноутбук» once (TZ 04 Э29)
     Alpine.data('pmLegacyOffer', () => ({
         show: false,
