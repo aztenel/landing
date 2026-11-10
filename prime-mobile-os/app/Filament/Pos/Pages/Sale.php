@@ -149,6 +149,12 @@ class Sale extends Page
         $this->tab = min(max(1, (int) request()->integer('tab', 1)), CartService::MAX_TABS);
         if (! $this->openShift()) {
             $this->openShiftWindow();
+        } elseif ($unitId = request()->integer('unit')) {
+            // «В чек» from the passport (TZ 04 Э10.3)
+            $inCart = collect($this->cart()->get('lines'))->contains(fn ($l) => $l['kind'] === 'unit' && (int) $l['unit_id'] === $unitId);
+            if (! $inCart) {
+                $this->attempt(fn () => $this->svc()->addUnit($this->cart(), $this->user(), $unitId), __('Добавлено'));
+            }
         }
     }
 
