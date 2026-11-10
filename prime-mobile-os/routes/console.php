@@ -19,3 +19,6 @@ Schedule::command('prime:release-reservations')->everyMinute()->withoutOverlappi
 
 // Approval requests: expiry, escalation to the admin, repeated push (TZ 03 §6.4)
 Schedule::command('prime:approvals-tick')->everyMinute()->withoutOverlapping();
+
+// Unclosed shifts: «Касса не закрыта» to the owner at 23:59, auto close «не сверена» at 03:00 (audit №57)
+Schedule::command('prime:shifts-tick')->everyMinute()->withoutOverlapping();

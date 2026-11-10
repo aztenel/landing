@@ -34,6 +34,7 @@ class LedgerServiceProvider extends ServiceProvider
         'purchase' => PurchaseHandler::class,
         'cost_entry' => \App\Domain\Inventory\Posting\CostEntryHandler::class,
         'cash_move' => \App\Domain\Money\Posting\CashMoveHandler::class,
+        'cash_adjustment' => \App\Domain\Money\Posting\CashAdjustmentHandler::class,
         'sale' => SaleHandler::class,
         'customer_return' => CustomerReturnHandler::class,
         'expense' => ExpenseHandler::class,

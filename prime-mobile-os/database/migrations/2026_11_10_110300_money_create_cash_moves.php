@@ -28,11 +28,12 @@ return new class extends Migration
             $table->string('status', 16)->nullable();       // collection: sent | accepted (changes after posting)
             $table->unsignedBigInteger('accepted_document_id')->nullable();
             $table->text('description')->nullable();
+            $table->string('shift_phase', 8)->nullable();   // adjustment РКС from a shift count: open | close (null = manual)
             $table->timestampsTz();
             $table->index(['organization_id', 'kind', 'status']);
         });
         DB::statement("ALTER TABLE cash_moves ADD CONSTRAINT cash_moves_kind_check CHECK (kind IN ('deposit','withdrawal','transfer','collection','collection_accept','adjustment'))");
-        DB::statement("ALTER TABLE cash_moves ADD CONSTRAINT cash_moves_amount_check CHECK (amount <> 0 AND (kind = 'adjustment' OR amount > 0) AND fee_amount >= 0)");
+        DB::statement("ALTER TABLE cash_moves ADD CONSTRAINT cash_moves_amount_check CHECK (amount <> 0 AND (kind = 'adjustment' OR amount > 0) AND fee_amount >= 0 AND (shift_phase IS NULL OR (kind = 'adjustment' AND shift_phase IN ('open','close'))))");
         foreach (['from_account_id' => 'money_accounts', 'to_account_id' => 'money_accounts', 'collection_document_id' => 'documents', 'accepted_document_id' => 'documents'] as $column => $referenced) {
             DB::statement("ALTER TABLE cash_moves ADD CONSTRAINT cash_moves_{$column}_same_org_fk
                 FOREIGN KEY (organization_id, {$column}) REFERENCES {$referenced} (organization_id, id) ON DELETE RESTRICT");
