@@ -3,6 +3,8 @@
 namespace App\Domain\Sales\Posting;
 
 use App\Domain\Counterparties\Enums\CounterpartyType;
+use App\Domain\Catalog\Models\AccessoryPrice;
+use App\Domain\Catalog\Models\VariantPrice;
 use App\Domain\Counterparties\Models\Customer;
 use App\Domain\Inventory\Enums\ImeiCheckResult;
 use App\Domain\Inventory\Enums\UnitAction;
@@ -28,6 +30,7 @@ use App\Domain\Ledger\Posting\LockPlan;
 use App\Domain\Ledger\Posting\PostingContext;
 use App\Domain\Money\Enums\ArticleCode;
 use App\Domain\Money\Enums\PaymentMethodCode;
+use App\Domain\Money\Models\PaymentMethod;
 use App\Domain\Sales\Models\CustomerReturn;
 use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Models\SaleLine;
@@ -108,6 +111,9 @@ class SaleHandler extends AbstractDocumentHandler
             if ($line->price < 0 || $line->line_discount < 0 || $line->line_discount > $line->price * $line->qty) {
                 throw PostingException::because('bad_discount', 'Скидка на строку больше её суммы');
             }
+            if ($line->is_gift && $line->stock_unit_id) {
+                throw PostingException::because('bad_gift', 'Телефон не может быть подарком');
+            }
             if ($line->is_gift && ($line->price !== 0 || $line->line_discount !== 0)) {
                 throw PostingException::because('bad_gift', 'Подарок к покупке продаётся за 0 ₸');
             }
@@ -128,8 +134,18 @@ class SaleHandler extends AbstractDocumentHandler
                 throw PostingException::because('bad_payment', 'Сумма оплаты должна быть больше нуля');
             }
             $method = $p->method;
-            if (($method->isMoney() || $method === PaymentMethodCode::TradeIn) && ! $p->account_id) {
-                throw PostingException::because('no_account', "Для оплаты «{$method->label()}» не настроен счёт");
+            // the trade-in offset is accepted only together with the trade-in act of the same operation (audit №6, №40);
+            // until the trade-in module plugs in, the method is closed
+            if ($method === PaymentMethodCode::TradeIn) {
+                throw PostingException::because('tradein_without_act', 'Зачёт trade-in принимается только вместе с актом trade-in');
+            }
+            if ($method->isMoney()) {
+                // account and bank commission come from the firm settings of the payment method, never from the request
+                $setup = PaymentMethod::resolve($method, $ctx->requireStoreId());
+                if (! $setup || ! $setup->account_id) {
+                    throw PostingException::because('no_account', "Способ оплаты «{$method->label()}» выключен или для него не настроен счёт");
+                }
+                $p->forceFill(['account_id' => $setup->account_id, 'commission_percent' => $setup->commission_percent])->save();
             }
             if ($method->isCash()) {
                 if ($p->tendered !== null && ($p->tendered < $p->amount || $p->tendered % Money::TENGE !== 0)) {
@@ -226,16 +242,30 @@ class SaleHandler extends AbstractDocumentHandler
         foreach ($bases as $id => $b) {
             $amounts[$id] = $b - $shares[$id]->amount;
         }
-        $subtotal = (int) $lines->sum(fn ($l) => $l->price * $l->qty);
-        $total = array_sum($amounts);
-        $discountTotal = (int) $lines->sum('line_discount') + (int) $sale->check_discount;
-
-        // 4. limits and permissions (TZ 03 §5)
-        $this->authorizeDiscount($ctx, $sale, $discountTotal, $subtotal);
+        // 4. limits and permissions (TZ 03 §5). The list price comes from the database, never from the request: a
+        // price below the list price is a discount for the limits, a gift is a 100 % discount (audit №2).
+        $markdown = 0;
+        $listSubtotal = 0;
         foreach ($lines as $line) {
-            if ($line->list_price_kzt !== null && $line->price > $line->list_price_kzt) {
+            $list = $this->listPrice($ctx, $line);
+            $line->forceFill(['list_price_kzt' => $list])->save();
+            if ($list === null) {
+                $listSubtotal += $line->price * $line->qty;
+
+                continue;
+            }
+            $listSubtotal += $list * $line->qty;
+            $markdown += max(0, $list - $line->price) * $line->qty;
+            if ($line->price > $list) {
                 $ctx->authorize('sale.price_up');
             }
+        }
+        $subtotal = (int) $lines->sum(fn ($l) => $l->price * $l->qty);
+        $total = array_sum($amounts);
+        $discountTotal = $markdown + (int) $lines->sum('line_discount') + (int) $sale->check_discount;
+
+        $this->authorizeDiscount($ctx, $sale, $discountTotal, $listSubtotal);
+        foreach ($lines as $line) {
             $unknownCost = $line->stock_unit_id && $ctx->locks->unit((int) $line->stock_unit_id)->cost_unknown;
             if (! $line->is_gift && ! $unknownCost && $amounts[$line->id] < $costs[$line->id]) {
                 $ctx->authorize('sale.below_cost', approvalType: 'below_cost', message: 'Нужно разрешение владельца: цена ниже допустимой');
@@ -470,6 +500,19 @@ class SaleHandler extends AbstractDocumentHandler
         if ((int) $balance->balance > 0 && $balance->nearest_due_date && CarbonImmutable::parse($balance->nearest_due_date)->lt($ctx->businessDate())) {
             $ctx->requireApprovalUnlessOwner('sale.credit', 'debt_overdue', 'У клиента просроченный долг — новый долг только с разрешения владельца');
         }
+    }
+
+    /** Retail price of the line at posting time: phone — its own price, else the variant price; accessory — the firm price list. */
+    private function listPrice(PostingContext $ctx, SaleLine $line): ?int
+    {
+        if ($line->stock_unit_id) {
+            $unit = $ctx->locks->unit((int) $line->stock_unit_id);
+            $price = $unit->sale_price ?? VariantPrice::query()->where('variant_id', $unit->variant_id)->value('price_kzt');
+        } else {
+            $price = AccessoryPrice::query()->where('accessory_id', $line->accessory_id)->value('price_kzt');
+        }
+
+        return $price === null ? null : (int) $price;
     }
 
     private function assertWholeTenge(?int $minor, string $what): void

@@ -256,13 +256,13 @@ it('keeps a seller of one store away from the cash account of another store', fu
     $otherStore = Store::query()->create(['name' => 'ТРЦ «Мега»']);
     $otherCash = MoneyAccount::query()->create(['code' => 'cash_kzt_mega', 'name' => 'Касса ₸ — Мега', 'type' => 'cash', 'currency' => 'KZT', 'store_id' => $otherStore->id]);
 
-    expect(fn () => SaleDraft::make($w->store, $w->seller)->accessory($w->case, 1, Money::kzt(9000))
-        ->pay('cash', Money::kzt(9000), ['account_id' => $otherCash->id])->post($w->seller))
-        ->toThrow(AccessDenied::class, 'счёт другого магазина');
-
-    // the owner works in all stores
-    expect(SaleDraft::make($w->store, $w->owner)->accessory($w->case, 1, Money::kzt(9000))
-        ->pay('cash', Money::kzt(9000), ['account_id' => $otherCash->id])->post($w->owner)->isPosted())->toBeTrue();
+    // the account in the request is ignored (audit №6): cash of a sale always goes to the cash of the sale's store
+    foreach ([$w->seller, $w->owner] as $actor) {
+        SaleDraft::make($w->store, $actor)->accessory($w->case, 1, Money::kzt(9000))
+            ->pay('cash', Money::kzt(9000), ['account_id' => $otherCash->id])->post($actor);
+    }
+    expect(MoneyEntry::query()->where('account_id', $otherCash->id)->exists())->toBeFalse()
+        ->and($w->balance('cash_kzt'))->toBe(Money::kzt(18000)->amount);
 });
 
 it('does not reveal a bank balance in an error to a role that does not see it (TZ 03 §4.1)', function () {

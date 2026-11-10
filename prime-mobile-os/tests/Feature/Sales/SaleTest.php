@@ -17,7 +17,7 @@ use App\Domain\Sales\Models\SalePayment;
 use App\Domain\Tenancy\Access\Exceptions\ApprovalRequired;
 use App\Support\Money\Money;
 
-/** TZ 02 §6.3 without the trade-in act: iPhone 15 Pro 549 000 + case 9 000, check discount 3 000. */
+/** TZ 02 §6.3 with a card instead of the trade-in offset (the offset needs the act): iPhone 15 Pro 549 000 + case 9 000, check discount 3 000. */
 function splitSaleWorld(): array
 {
     $w = world(['bonus' => ['phone_percent' => '3.00', 'accessory_percent' => '5.00']]);
@@ -35,7 +35,7 @@ it('posts the split sale of TZ 02 §6.3: discount spread, change, commission, co
         ->unit($unit, Money::kzt(549000))
         ->accessory($w->case, 1, Money::kzt(9000))
         ->discount(Money::kzt(3000))
-        ->pay('tradein', Money::kzt(150000))
+        ->pay('card', Money::kzt(150000))
         ->pay('kaspi_qr', Money::kzt(200000))
         ->cash(Money::kzt(205000), tendered: Money::kzt(210000))
         ->post($w->owner);
@@ -55,7 +55,7 @@ it('posts the split sale of TZ 02 §6.3: discount spread, change, commission, co
 
     expect($w->balance('kaspi_qr'))->toBe(Money::kzt(198000)->amount)
         ->and($w->balance('cash_kzt'))->toBe(Money::kzt(205000)->amount)
-        ->and($w->balance('tradein_offset'))->toBe(Money::kzt(150000)->amount) // the trade-in act (module) brings it to 0
+        ->and($w->balance('halyk_terminal'))->toBe(Money::kzt(150000)->amount)
         ->and(SalePayment::query()->where('document_id', $doc->id)->where('method', 'cash')->value('change'))->toBe(Money::kzt(5000)->amount);
 
     expect($unit->refresh()->status)->toBe(UnitStatus::Sold)
@@ -124,9 +124,52 @@ it('asks for approval when the seller exceeds limits; the draft stays without a 
     expect(fn () => SaleDraft::make($w->store, $w->seller)->customer($w->customer)->unit($unit, Money::kzt(549000))
         ->cash(Money::kzt(500000))->debt(Money::kzt(49000), now()->addDays(5))->post($w->seller))->toThrow(ApprovalRequired::class);
 
-    // selling below cost needs the owner even within discount limits
+    // selling below cost needs the owner even within discount limits (the list price itself is below cost here)
+    $unit->forceFill(['sale_price' => Money::kzt(400000)->amount])->save();
     expect(fn () => SaleDraft::make($w->store, $w->seller)->unit($unit, Money::kzt(400000))->cash(Money::kzt(400000))->post($w->seller))
         ->toThrow(ApprovalRequired::class, 'ниже допустимой');
+});
+
+it('counts a price below the list price and a gift as a discount: the limit cannot be bypassed (audit №2)', function () {
+    [$w, $unit] = splitSaleWorld();
+    $unit->forceFill(['sale_price' => Money::kzt(549000)->amount])->save();
+
+    // the seller lowers the price by 6 000 instead of giving a discount → limit L1 (5 000 ₸)
+    try {
+        SaleDraft::make($w->store, $w->seller)->unit($unit, Money::kzt(543000), listPrice: Money::kzt(543000))->cash(Money::kzt(543000))->post($w->seller);
+        $this->fail('Approval expected');
+    } catch (ApprovalRequired $e) {
+        expect($e->approvalType)->toBe('discount')->and($e->context['limit'])->toBe('L1');
+    }
+
+    // a «gift» without an owner promotion is a 100 % discount: 2 cases at 9 000 = 18 000 ₸ > 5 000 ₸
+    \App\Domain\Catalog\Models\AccessoryPrice::query()->updateOrCreate(['accessory_id' => $w->case->id], ['price_kzt' => Money::kzt(9000)->amount]);
+    expect(fn () => SaleDraft::make($w->store, $w->seller)->unit($unit, Money::kzt(549000))->gift($w->case, 2)->cash(Money::kzt(549000))->post($w->seller))
+        ->toThrow(ApprovalRequired::class);
+
+    // within the limit it posts; the list price on the line is the database price
+    $doc = SaleDraft::make($w->store, $w->seller)->unit($unit, Money::kzt(546000), listPrice: Money::kzt(1))->cash(Money::kzt(546000))->post($w->owner);
+    expect(SaleLine::query()->where('document_id', $doc->id)->value('list_price_kzt'))->toBe(Money::kzt(549000)->amount)
+        ->and(Sale::query()->where('document_id', $doc->id)->value('discount_total'))->toBe(Money::kzt(3000)->amount);
+});
+
+it('takes the payment account and bank commission from the firm settings, not from the request (audit №6)', function () {
+    $w = world();
+    PaymentMethod::query()->where('code', 'kaspi_qr')->update(['commission_percent' => '1.00']);
+    $unit = $w->phone();
+
+    $doc = SaleDraft::make($w->store, $w->seller)->unit($unit, Money::kzt(500000))
+        ->pay('kaspi_qr', Money::kzt(500000), ['account_id' => $w->account('cash_kzt')->id, 'commission_percent' => '0.00'])
+        ->post($w->owner);
+
+    $payment = SalePayment::query()->where('document_id', $doc->id)->first();
+    expect($payment->account_id)->toBe($w->account('kaspi_qr')->id)
+        ->and($w->balance('kaspi_qr'))->toBe(Money::kzt(495000)->amount)
+        ->and($w->balance('cash_kzt'))->toBe(0);
+
+    // the trade-in offset needs the act
+    expect(fn () => SaleDraft::make($w->store, $w->seller)->unit($w->phone(), Money::kzt(500000))->pay('tradein', Money::kzt(500000))->post($w->owner))
+        ->toThrow(PostingException::class, 'актом trade-in');
 });
 
 it('requires a fresh IMEI registry check for sellers (TZ 02 §10.4 p.3)', function () {

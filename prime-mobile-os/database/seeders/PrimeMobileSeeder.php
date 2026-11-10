@@ -304,7 +304,7 @@ class PrimeMobileSeeder extends Seeder
         $this->sale($now->subMinutes(190), $aigerim, $aigerim, null, [40], [], 0, [['card', 164900]]);
         $this->sale($now->subMinutes(162), $owner, $daniyar, 'sanzhar', [38], [], 0, [['debt', 719000, null, 14]]);
         $this->sale($now->subMinutes(115), $aigerim, $aigerim, 'erlan', [1], [], 0, [['cash', 100000], ['kaspi_qr', 114000]]);
-        $this->sale($now->subMinutes(80), $daniyar, $daniyar, null, [], ['APP-AIRPODS-PRO2' => [1, 109500], 'GLASS-CAM' => [1, 8000]], 0, [['cash', 117500, 120000]]);
+        $this->sale($now->subMinutes(80), $daniyar, $daniyar, null, [], ['APP-AIRPODS-PRO2' => [1, 115000], 'GLASS-CAM' => [1, 8000]], 3000, [['cash', 120000, 120000]]);
         $this->sale($now->subMinutes(40), $aigerim, $aigerim, null, [35], [], 0, [['kaspi_qr', 649000]]);
     }
 
