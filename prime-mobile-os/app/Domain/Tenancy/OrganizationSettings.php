@@ -30,6 +30,9 @@ final class OrganizationSettings
             'order_hold_days' => 3,
             'customer_debt_ceiling' => 30000000,          // tiyn (300 000 ₸): above it only the owner (audit №17)
         ],
+        'storefront' => [
+            'code_prefix' => 'PM',                        // public code of phones PM-10001 (audit №43)
+        ],
         'documents' => [
             'backdate_max_days' => 3,
             'backdate_grace_minutes' => 10,

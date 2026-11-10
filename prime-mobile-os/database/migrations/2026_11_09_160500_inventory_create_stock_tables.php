@@ -15,8 +15,7 @@ return new class extends Migration
 
     public function up(): void
     {
-        // Public code for the storefront: PM-10001… unique globally (not per organization).
-        DB::statement('CREATE SEQUENCE IF NOT EXISTS stock_units_public_code_seq START WITH 10001');
+        // Public code for the storefront: <prefix>-10001… with a counter of each firm (audit №43, migration …170800).
 
         Schema::create('stock_units', function (Blueprint $table) {
             $table->id();
@@ -32,7 +31,7 @@ return new class extends Migration
             $table->string('imei1', 32)->nullable();
             $table->string('imei2', 32)->nullable();
             $table->string('serial', 64)->nullable();
-            $table->string('public_code', 16)->default(DB::raw("('PM-' || nextval('stock_units_public_code_seq'))"))->unique();
+            $table->string('public_code', 16)->nullable();             // set by the trigger pm_stock_unit_public_code
             $table->boolean('show_on_site')->default(false);
             $table->bigInteger('sale_price')->nullable();              // tiyn
             // Copies maintained by InventoryLedger only (TZ 02 §11.3). status NULL = «нет в учёте» (creation reversed).
@@ -59,7 +58,6 @@ return new class extends Migration
             $table->index(['organization_id', 'imei1']);
         });
         // dropped together with the table (migrate:fresh drops tables only)
-        DB::statement('ALTER SEQUENCE stock_units_public_code_seq OWNED BY stock_units.public_code');
         $statuses = "'".implode("','", self::STATUSES)."'";
         DB::statement("ALTER TABLE stock_units ADD CONSTRAINT stock_units_status_check CHECK (status IS NULL OR status IN ($statuses))");
         DB::statement("ALTER TABLE stock_units ADD CONSTRAINT stock_units_condition_check CHECK (condition IN ('new','used'))");
@@ -156,6 +154,6 @@ return new class extends Migration
         foreach (['accessory_costs', 'accessory_balances', 'price_changes', 'imei_checks', 'unit_reservations', 'unit_identifiers', 'stock_units'] as $t) {
             Schema::dropIfExists($t);
         }
-        DB::statement('DROP SEQUENCE IF EXISTS stock_units_public_code_seq');
+        
     }
 };

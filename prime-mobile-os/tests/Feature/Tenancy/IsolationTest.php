@@ -112,3 +112,14 @@ it('keeps accessories per firm: another firm does not see them and may reuse the
         'organization_id' => $b->org->id, 'accessory_id' => $caseOfA->id, 'total_qty' => 0, 'avg_cost_kzt' => 0, 'updated_at' => now(),
     ])))->toThrow(\Illuminate\Database\QueryException::class);
 });
+
+it('numbers public codes per firm with the firm prefix (audit №43)', function () {
+    $a = world();
+    $first = $a->phone();
+    $b = world(['storefront' => ['code_prefix' => 'XX']], 'Другая фирма');
+    $other = $b->phone();
+
+    expect($first->refresh()->public_code)->toBe('PM-10001')
+        ->and($other->refresh()->public_code)->toBe('XX-10001')
+        ->and($b->phone()->refresh()->public_code)->toBe('XX-10002');
+});
