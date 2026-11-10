@@ -21,8 +21,10 @@ use Livewire\Livewire;
 
 function fakeSfon(int $newCount = 2): void
 {
-    config(['services.sfon.key' => 'test-key', 'services.sfon.pause_ms' => 0]);
-    Http::fake(function ($req) use ($newCount) {
+    // a second call changes the stock that sfon answers (the first fake callback stays registered and reads it)
+    config(['services.sfon.key' => 'test-key', 'services.sfon.pause_ms' => 0, 'services.sfon.test_new_count' => $newCount]);
+    Http::fake(function ($req) {
+        $newCount = config('services.sfon.test_new_count');
         expect($req->header('X-API-Key')[0] ?? null)->toBe('test-key');
         $p = parse_url($req->url(), PHP_URL_PATH);
 
@@ -166,4 +168,57 @@ it('the screen «Перенос» is for the owner only and shows the quality re
         ->set('tab', 'scan')->set('imei', '111')->call('scan')->assertSee('IMEI с ошибкой')
         ->set('tab', 'off')->call('switchOff')->assertSee('все 7 условий');
     expect(DB::table('migration_checklist')->where('step', 'Ш0')->value('status'))->toBe('done');
+});
+
+// ТЗ 07 §6, раздел J (приёмка).
+
+it('57: day X — sfon has 8, scanned 7 + 1 unknown IMEI: 7 taken, 1 «Не найдено», 1 «Лишний» asks «Какой это телефон?»; the ВХО waits for it', function () {
+    $w = world();
+    fakeSfon(8);
+    app(SfonPull::class)->all($w->owner);
+    $group = ImportRow::query()->where('kind', 'stock_new')->first();
+    $group->update(['fields' => $group->fields + ['cost' => Money::kzt(489250)->amount]]);
+    ImportRow::query()->where('kind', 'stock_used')->update(['status' => 'skipped']);
+    DB::table('migration_checklist')->insert(['organization_id' => $w->org->id, 'step' => 'Ш6', 'status' => 'done', 'done_at' => now()]);
+    $dx = app(DayX::class);
+    $i = fn ($n) => Imei::withCheckDigit('35693923448'.str_pad((string) $n, 3, '0', STR_PAD_LEFT));
+    foreach (range(1, 7) as $n) {
+        expect($dx->scan($w->store, $i($n), $w->owner)['result'])->toBe('choose');
+        expect($dx->takeNew($w->store, $i($n), $group->id, $w->owner)['result'])->toBe('ok');
+    }
+    $unknown = $dx->scan($w->store, $i(99), $w->owner);
+    expect($unknown['result'])->toBe('choose')->and($unknown['message'])->toBe('Какой это телефон?');
+
+    $q = $dx->quality();
+    expect($q['not_found'])->toBe(1)->and($q['unresolved'])->toBe(1)->and($q['scanned'])->toBe(8);
+    $w->rate('515');
+    expect(fn () => $dx->post($w->store, [], $w->owner))->toThrow(UserFacingException::class, 'Сначала разберите «Лишние»');
+
+    // the owner answers «Какой это телефон?» — then the ВХО posts: 7 sfon phones + 1 extra
+    expect($dx->scan($w->store, $i(99), $w->owner)['result'])->toBe('choose'); // asked again, not «уже отсканирован»
+    $dx->extra($w->store, $i(99), $w->usedIphone->id, 'used', Money::kzt(219000)->amount, Money::kzt(150000)->amount, $w->owner);
+    expect($dx->quality()['unresolved'])->toBe(0);
+    $dx->post($w->store, [], $w->owner);
+    expect(StockUnit::query()->count())->toBe(8);
+});
+
+it('58: the nightly check — sfon has a sale we do not: «sfon 3, у нас 4», «вероятная причина не найдена», streak 0', function () {
+    $w = world();
+    fakeSfon(4);
+    app(SfonPull::class)->all($w->owner);
+    $group = ImportRow::query()->where('kind', 'stock_new')->first();
+    $group->update(['fields' => $group->fields + ['cost' => Money::kzt(489250)->amount]]);
+    ImportRow::query()->where('kind', 'stock_used')->update(['status' => 'skipped']);
+    DB::table('migration_checklist')->insert(['organization_id' => $w->org->id, 'step' => 'Ш6', 'status' => 'done', 'done_at' => now()]);
+    $dx = app(DayX::class);
+    foreach (range(1, 4) as $n) {
+        $dx->takeNew($w->store, Imei::withCheckDigit('35693923449'.str_pad((string) $n, 3, '0', STR_PAD_LEFT)), $group->id, $w->owner);
+    }
+    $dx->post($w->store, [], $w->owner);
+
+    fakeSfon(3); // a sale in sfon that was not repeated here
+    $r = app(SfonReconcile::class)->run();
+    expect(collect($r['diffs'])->pluck('text')->implode(' | '))->toContain('sfon 3, у нас 4')
+        ->and(collect($r['diffs'])->firstWhere('kind', 'count')['cause'])->toContain('вероятная причина не найдена')
+        ->and($r['streak'])->toBe(0);
 });

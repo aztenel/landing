@@ -232,7 +232,9 @@ class RoleEditor
     {
         $order = array_flip(RoleTemplates::codes());
 
-        return Role::query()->where('organization_id', CurrentOrganization::instance()->requireId())->get()
+        // the role «Техподдержка» of the integrator access (TZ 03 §13) is fixed — it is not edited and not given to staff
+        return Role::query()->where('organization_id', CurrentOrganization::instance()->requireId())
+            ->where('name', '!=', \App\Domain\Tenancy\Services\IntegratorAccess::ROLE)->get()
             ->sortBy(fn (Role $r) => [$order[$r->name] ?? 100, $r->id])->values()->all();
     }
 

@@ -207,6 +207,13 @@ class CustomerReturnHandler extends AbstractDocumentHandler
         $tz = $ctx->organization->timezone;
         $days = (int) abs(CarbonImmutable::parse($saleDoc->occurred_at)->setTimezone($tz)->startOfDay()->diffInDays($ctx->occurredAt()->setTimezone($tz)->startOfDay()));
         if ($hasPhone) {
+            // a phone of proper quality that «не подошёл»: the shop is not obliged to take it back (non-returnable list,
+            // not checked by a lawyer) — only the owner decides (ТЗ 00-kazakhstan §9, ТЗ 07 сценарий 33)
+            $goodPhone = CustomerReturnLine::query()->where('document_id', $document->id)->where('reason', 'not_fit')
+                ->whereIn('sale_line_id', SaleLine::query()->where('document_id', $saleDoc->id)->whereNotNull('stock_unit_id')->select('id'))->exists();
+            if ($goodPhone) {
+                $ctx->requireApprovalUnlessOwner('return.phone', 'return', 'Телефон надлежащего качества по закону возвращать не обязаны (не проверено юристом). Вернуть можно только по решению владельца');
+            }
             $ctx->authorize('return.phone', Limit::ReturnPhone, $phones, 'return');
             $ctx->authorize('return.phone', Limit::ReturnDays, $days, 'return');
         }

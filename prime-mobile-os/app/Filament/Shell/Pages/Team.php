@@ -9,6 +9,7 @@ use App\Domain\Shell\Services\StaffManager;
 use App\Domain\Shell\Services\TwoFactor;
 use App\Domain\Tenancy\Models\Membership;
 use App\Domain\Tenancy\Models\Store;
+use App\Domain\Tenancy\Services\IntegratorAccess;
 use App\Filament\Shell\Concerns\HasErpAccess;
 use App\Models\User;
 use App\Support\Exceptions\UserFacingException;
@@ -62,6 +63,13 @@ class Team extends Page
 
     /** @var array<string, string|null> limits in user units (₸, %, days) */
     public array $limits = [];
+
+    // integrator access (TZ 03 §13)
+    public int $supportHours = 1;
+
+    public string $supportPurpose = '';
+
+    public string $supportPassword = '';
 
     public static function getNavigationLabel(): string
     {
@@ -117,6 +125,34 @@ class Team extends Page
         } catch (UserFacingException $e) {
             Notification::make()->danger()->title($e->getMessage())->send();
         }
+    }
+
+    // ------------------------------------------------------------------ support access (TZ 03 §13)
+
+    public function grantSupport(): void
+    {
+        try {
+            $integrator = User::query()->where('is_superadmin', true)->orderBy('id')->firstOrFail();
+            $m = app(IntegratorAccess::class)->grant($integrator, $this->supportHours, $this->supportPurpose, auth()->user(), $this->supportPassword);
+            $this->reset('supportPurpose', 'supportPassword');
+            Notification::make()->success()->title(__('Доступ открыт до :time', ['time' => $m->support_until->timezone(config('app.timezone'))->format('H:i')]))->send();
+        } catch (UserFacingException $e) {
+            $this->supportPassword = '';
+            Notification::make()->danger()->title($e->getMessage())->send();
+        }
+    }
+
+    public function closeSupport(): void
+    {
+        if (! Access::isOwner()) {
+            Notification::make()->danger()->title(__('Закрыть доступ может только владелец'))->send();
+
+            return;
+        }
+        if ($m = IntegratorAccess::active()) {
+            app(IntegratorAccess::class)->close($m, auth()->user());
+        }
+        Notification::make()->success()->title(__('Доступ техподдержки закрыт'))->send();
     }
 
     // ------------------------------------------------------------------ roles
@@ -182,7 +218,9 @@ class Team extends Page
         $role = $this->roleId ? collect($roles)->firstWhere('id', $this->roleId) : null;
 
         return [
-            'members' => Membership::query()->with(['user', 'stores'])->orderBy('id')->get(),
+            'members' => Membership::query()->with(['user', 'stores'])->whereNull('support_until')->orderBy('id')->get(),
+            'support' => IntegratorAccess::active(),
+            'hasIntegrator' => Access::isOwner() && User::query()->where('is_superadmin', true)->exists(),
             'roles' => $roles,
             'stores' => Store::query()->orderBy('id')->get(),
             'matrix' => $role ? app(RoleEditor::class)->matrix($role) : [],

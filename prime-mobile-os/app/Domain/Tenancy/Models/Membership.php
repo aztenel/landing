@@ -43,6 +43,7 @@ class Membership extends Model
             'rules_accepted_at' => 'datetime',
             'last_login_at' => 'datetime',
             'hints_seen' => 'boolean',
+            'support_until' => 'datetime',
         ];
     }
 
@@ -51,9 +52,10 @@ class Membership extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** Active; a temporary support access of the integrator (TZ 03 §13) ends by itself at support_until. */
     public function isActive(): bool
     {
-        return $this->status === MembershipStatus::Active;
+        return $this->status === MembershipStatus::Active && ($this->support_until === null || $this->support_until->isFuture());
     }
 
     public function stores(): HasMany

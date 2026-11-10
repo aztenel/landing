@@ -520,7 +520,9 @@ class CartService
             $amount = Money::kztMinor((int) $p['amount']);
             match ($p['method']) {
                 'cash' => $d->cash($amount, isset($p['tendered']) ? Money::kztMinor((int) $p['tendered']) : null),
-                'debt' => $d->debt($amount, CarbonImmutable::parse($p['due_date'] ?: now()->addDays(30)->toDateString())),
+                // ТЗ 07 сценарий 12: no silent «+30 дней» — the seller must enter the date
+                'debt' => $d->debt($amount, ($p['due_date'] ?? '') !== '' ? CarbonImmutable::parse($p['due_date'])
+                    : throw PostingException::because('due_date_required', 'Укажите дату возврата долга')),
                 default => $d->pay($p['method'], $amount),
             };
         }

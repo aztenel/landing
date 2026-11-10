@@ -119,7 +119,7 @@
         <div class="{{ $card }} overflow-x-auto">
             <table class="w-full text-sm"><tbody class="divide-y divide-border">
                 @foreach ($scans as $s)
-                    <tr><td class="num px-3 py-2">{{ $s->imei }}</td><td class="px-3 py-2">{{ $variants[$s->variant_id]?->title() }}</td><td class="px-3 py-2">{{ $s->condition === 'used' ? __('б/у') : __('новый') }}{{ $s->extra ? ' · '.__('лишний') : '' }}</td>
+                    <tr><td class="num px-3 py-2">{{ $s->imei }}</td><td class="px-3 py-2">@if ($s->variant_id){{ $variants[$s->variant_id]?->title() }}@else<button type="button" wire:click="$set('pending', {{ json_encode(['imei' => $s->imei]) }})" class="text-xs font-medium text-bad underline">{{ __('Какой это телефон?') }}</button>@endif</td><td class="px-3 py-2">{{ $s->condition === 'used' ? __('б/у') : __('новый') }}{{ $s->extra ? ' · '.__('лишний') : '' }}</td>
                         <td class="px-3 py-2 text-right"><button type="button" wire:click="removeScan({{ $s->id }})" class="text-xs text-muted-foreground hover:text-bad">{{ __('удалить') }}</button></td></tr>
                 @endforeach
             </tbody></table>

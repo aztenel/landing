@@ -98,7 +98,7 @@ it('sells on credit with a due date and accrues bonuses only on the paid part', 
 
     expect(fn () => SaleDraft::make($w->store, $w->owner)->customer($w->customer)->unit($unit, Money::kzt(500000))
         ->cash(Money::kzt(400000))->pay('debt', Money::kzt(100000))->post($w->owner))
-        ->toThrow(PostingException::class, 'срок');
+        ->toThrow(PostingException::class, 'дату возврата');
 
     SaleDraft::make($w->store, $w->owner)->customer($w->customer)->unit($unit, Money::kzt(500000))
         ->cash(Money::kzt(400000))->debt(Money::kzt(100000), now()->addDays(10))->post($w->owner);

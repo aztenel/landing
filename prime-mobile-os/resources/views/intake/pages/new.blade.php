@@ -88,6 +88,17 @@
                                     <button type="button" class="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-white desk:hidden" x-on:click.stop="PM.scanner.open()" aria-label="{{ __('Камера') }}"><x-ui::icon name="camera" class="h-5 w-5" /></button>
                                 @endif
                             </div>
+                            @if ($active === $i && $scanWarning && ! $scanError)
+                                <p class="mt-2 rounded-lg bg-warn/10 px-3 py-2 text-sm" role="status">{{ $scanWarning }}</p>
+                            @endif
+                            @if ($active === $i && $scanError)
+                                <p class="mt-2 rounded-lg bg-bad/10 px-3 py-2 text-sm text-bad" role="alert" data-pm-scan-error>{{ $scanError }}@if ($scanPassport) · <a href="{{ route('erp.stock.units.show', $scanPassport) }}" class="font-medium underline">{{ __('Открыть паспорт?') }}</a>@endif</p>
+                            @endif
+                            @if ($canCost && $b['variant_id'] && (float) str_replace(',', '.', (string) $b['price']) > 0 && (int) preg_replace('/\D/', '', (string) $b['sale_price']) > 0)
+                                @php($unitCost = (int) round((float) str_replace(',', '.', (string) $b['price']) * ($cur === '$' ? $rate : 1)))
+                                @php($margin = (int) preg_replace('/\D/', '', (string) $b['sale_price']) - $unitCost)
+                                <p class="mt-2 text-sm text-muted-foreground" data-pm-margin>{{ __('Себестоимость :c ₸ · маржа :m ₸ на штуку', ['c' => number_format($unitCost, 0, '', ' '), 'm' => number_format($margin, 0, '', ' ')]) }}@if ($ok > 0) · {{ __('итог партии :t ₸', ['t' => number_format($unitCost * $ok, 0, '', ' ')]) }}@endif</p>
+                            @endif
                             @if ($b['rows'])
                                 <ol class="mt-3 max-h-72 divide-y divide-border overflow-y-auto rounded-lg border border-border text-sm">
                                     @foreach ($b['rows'] as $r => $row)
@@ -119,7 +130,8 @@
 
             @if ($preview)
                 <section class="rounded-xl border border-border bg-card">
-                    <h3 class="border-b border-border px-4 py-3 font-semibold">{{ __('Предпросмотр файла') }} · {{ count($preview) }} {{ __('строк') }}</h3>
+                    <h3 class="border-b border-border px-4 py-3 font-semibold">{{ __('Предпросмотр файла') }} · {{ count($preview) }} {{ __('строк') }}
+                        · <span class="text-ok">{{ __(':n ок', ['n' => collect($preview)->whereNull('error')->count()]) }}</span>@if (collect($preview)->whereNotNull('error')->isNotEmpty()) · <span class="text-bad">{{ __(':n с ошибкой', ['n' => collect($preview)->whereNotNull('error')->count()]) }}</span>@endif</h3>
                     <div class="max-h-80 overflow-y-auto">
                         @foreach ($preview as $p => $row)
                             <div class="flex items-center gap-3 border-b border-border px-4 py-2 text-sm {{ $row['error'] ? 'bg-bad/5' : '' }}" wire:key="p{{ $p }}">
@@ -129,7 +141,7 @@
                             </div>
                         @endforeach
                     </div>
-                    <div class="flex justify-end gap-2 p-3"><button type="button" wire:click="$set('preview', [])" class="h-9 rounded-lg border border-border px-3 text-sm">{{ __('Отмена') }}</button><button type="button" wire:click="usePreview" class="h-9 rounded-lg bg-primary px-4 text-sm text-white">{{ __('Добавить в приход') }}</button></div>
+                    <div class="flex justify-end gap-2 p-3"><button type="button" wire:click="$set('preview', [])" class="h-9 rounded-lg border border-border px-3 text-sm">{{ __('Отмена') }}</button><button type="button" wire:click="usePreview" @disabled(collect($preview)->whereNotNull('error')->isNotEmpty()) title="{{ __('Исправьте ошибки в файле или удалите строки') }}" class="h-9 rounded-lg bg-primary px-4 text-sm text-white disabled:opacity-50">{{ __('Добавить в приход') }}</button></div>
                 </section>
             @endif
 

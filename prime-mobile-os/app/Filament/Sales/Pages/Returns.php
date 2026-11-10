@@ -286,7 +286,7 @@ class Returns extends Page
         $d = CustomerReturnDraft::make($sale)->author(auth()->user());
         foreach (collect($this->pick)->filter(fn ($p) => $p['on']) as $lineId => $p) {
             $line = SaleLine::query()->where('document_id', $sale->id)->findOrFail($lineId);
-            $d->line($line, max(1, (int) $p['qty']), $line->stock_unit_id ? $p['status'] : 'in_stock');
+            $d->line($line, max(1, (int) $p['qty']), $line->stock_unit_id ? $p['status'] : 'in_stock', reason: $p['reason'] ?? null);
         }
         foreach ($this->refunds as $r) {
             $amount = (int) preg_replace('/\D/', '', (string) $r['amount']);
@@ -324,6 +324,22 @@ class Returns extends Page
 
         return [$return, $newSale];
     }
+
+    /**
+     * TZ 00-kazakhstan §9 / ТЗ 07 сценарий 33: a phone of proper quality that «не подошёл» — the shop is not obliged to
+     * take it back (phones are in the list of non-returnable goods; not checked by a lawyer), only the owner decides.
+     */
+    public function goodPhoneReturn(): bool
+    {
+        if (! $this->saleId) {
+            return false;
+        }
+        $phones = SaleLine::query()->where('document_id', $this->saleId)->whereNotNull('stock_unit_id')->pluck('id')->all();
+
+        return collect($this->pick)->contains(fn ($p, $lineId) => ($p['on'] ?? false) && ($p['reason'] ?? '') === 'not_fit' && in_array((int) $lineId, $phones, true));
+    }
+
+    public const LAW_HINT = 'Телефон надлежащего качества по закону возвращать не обязаны (не проверено юристом). Вернуть можно только по решению владельца — отправьте заявку';
 
     public function post(): void
     {
@@ -388,6 +404,7 @@ class Returns extends Page
             'request' => $this->requestId ? ApprovalRequest::query()->find($this->requestId) : null,
             'done' => $this->doneId ? Document::query()->find($this->doneId) : null,
             'canPost' => Access::allows('return.phone') || Access::allows('return.accessory'),
+            'lawHint' => $this->goodPhoneReturn(),
             'recent' => CustomerReturn::query()->whereIn('document_id', Document::query()->where('type', 'customer_return')->whereIn('store_id', WorkingStore::available(auth()->user())->pluck('id'))->select('id'))->latest('id')->limit(10)->get(),
             'tz' => $tz,
         ];

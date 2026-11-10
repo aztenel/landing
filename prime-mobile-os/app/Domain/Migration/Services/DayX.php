@@ -53,7 +53,10 @@ final class DayX
             return ['result' => 'bad', 'message' => __('IMEI с ошибкой — переснимите или введите с *#06#')];
         }
         $dup = DB::table('migration_scans')->where('organization_id', CurrentOrganization::instance()->requireId())->where('imei', $imei)->first();
-        if ($dup) {
+        if ($dup && $dup->import_row_id === null && $dup->variant_id === null && ! $usedRowId) {
+            return ['result' => 'choose', 'message' => __('Какой это телефон?'), 'imei' => $imei]; // still a «Лишний» to resolve
+        }
+        if ($dup && ! ($dup->import_row_id === null && $dup->variant_id === null)) {
             return ['result' => 'dup', 'message' => __('Уже отсканирован (строка :n)', ['n' => DB::table('migration_scans')->where('organization_id', $dup->organization_id)->where('id', '<=', $dup->id)->count()])];
         }
         if (StockUnit::findByIdentifier($imei)) {
@@ -66,9 +69,14 @@ final class DayX
             return $this->take($store, $imei, $row, 'used', $user);
         }
 
-        // a new phone: the first free group of its variant in this store — the variant comes from the sfon rows by model name in the scan? No IMEI in sfon:
-        // the seller confirms the variant only when several groups are possible (handled by the screen with $choose)
-        return ['result' => 'choose', 'message' => __('Выберите, какой это телефон'), 'imei' => $imei];
+        // a new phone: sfon has no IMEI, the screen asks «Какой это телефон?» (a group of sfon or a «лишний»). Until it is
+        // answered the scan waits in «Лишние» without a model, and the ВХО is not posted (ТЗ 07 §1.7, сценарий 57)
+        if (! $dup) {
+            DB::table('migration_scans')->insert(['organization_id' => CurrentOrganization::instance()->requireId(), 'store_id' => $store->id, 'imei' => $imei,
+                'extra' => true, 'scanned_by' => $user->id, 'created_at' => now()]);
+        }
+
+        return ['result' => 'choose', 'message' => __('Какой это телефон?'), 'imei' => $imei];
     }
 
     /** The screen picked a group (new) for the scanned IMEI. */
@@ -85,7 +93,7 @@ final class DayX
     /** A phone that is not in sfon (TZ 07 §1.7 «Лишние»): variant, condition, price and cost entered on the spot. */
     public function extra(Store $store, string $imei, int $variantId, string $condition, ?int $price, ?int $cost, User $user): array
     {
-        DB::table('migration_scans')->insert(['organization_id' => CurrentOrganization::instance()->requireId(), 'store_id' => $store->id, 'imei' => Imei::normalize($imei),
+        DB::table('migration_scans')->updateOrInsert(['organization_id' => CurrentOrganization::instance()->requireId(), 'imei' => Imei::normalize($imei)], ['store_id' => $store->id,
             'variant_id' => $variantId, 'condition' => $condition === 'used' ? 'used' : 'new', 'extra' => true, 'price' => $price, 'cost' => $cost, 'scanned_by' => $user->id, 'created_at' => now()]);
 
         return ['result' => 'extra', 'message' => __('Записан как «лишний» — найден при переносе')];
@@ -94,8 +102,8 @@ final class DayX
     private function take(Store $store, string $imei, ImportRow $row, string $condition, User $user): array
     {
         $f = (array) $row->fields;
-        DB::table('migration_scans')->insert(['organization_id' => CurrentOrganization::instance()->requireId(), 'store_id' => $store->id, 'imei' => $imei, 'import_row_id' => $row->id,
-            'variant_id' => $f['variant_id'] ?? null, 'condition' => $condition, 'price' => $f['price'] ?? null, 'battery' => $f['battery'] ?? null, 'scanned_by' => $user->id, 'created_at' => now()]);
+        DB::table('migration_scans')->updateOrInsert(['organization_id' => CurrentOrganization::instance()->requireId(), 'imei' => $imei], ['store_id' => $store->id, 'import_row_id' => $row->id,
+            'variant_id' => $f['variant_id'] ?? null, 'condition' => $condition, 'extra' => false, 'price' => $f['price'] ?? null, 'battery' => $f['battery'] ?? null, 'scanned_by' => $user->id, 'created_at' => now()]);
         $done = $condition === 'new' ? ((int) $f['count'] - $this->left($row)) : 1;
 
         return ['result' => 'ok', 'message' => $condition === 'new' ? __(':v — :a из :b', ['v' => Variant::query()->find($f['variant_id'])?->title(), 'a' => $done, 'b' => $f['count']])
@@ -132,6 +140,7 @@ final class DayX
             'sfon_new' => (int) $rows('stock_new')->get()->sum(fn ($r) => $r->fields['count'] ?? 0), 'sfon_used' => $rows('stock_used')->count(),
             'no_variant' => $rows('stock_new')->where('status', 'error')->count() + $rows('stock_used')->where('status', 'error')->count(),
             'scanned' => $scans->count(), 'extra' => $scans->where('extra', true)->count(),
+            'unresolved' => $scans->filter(fn ($s) => $s->import_row_id === null && $s->variant_id === null)->count(),
             'not_found' => (int) $rows('stock_new')->where('status', 'matched')->get()->sum(fn ($r) => max(0, $this->left($r))) + $rows('stock_used')->where('status', 'matched')->get()->filter(fn ($r) => ! $this->taken($r->id))->count(),
             'no_cost' => $noCost, 'no_kk' => $kkMissing,
             'accessories' => ImportRow::query()->where('kind', 'accessories')->where('status', 'matched')->count(),
@@ -164,6 +173,11 @@ final class DayX
         }
         if (Document::query()->where('idempotency_key', 'like', 'sfon-vxo-'.$store->id.'-%')->where('status', 'posted')->exists()) {
             throw UserFacingException::because('vxo_done', __('Входящие остатки этого магазина уже проведены'));
+        }
+        $unresolved = DB::table('migration_scans')->where('organization_id', CurrentOrganization::instance()->requireId())->where('store_id', $store->id)
+            ->whereNull('import_row_id')->whereNull('variant_id')->count();
+        if ($unresolved > 0) {
+            throw UserFacingException::because('extras_unresolved', __('Сначала разберите «Лишние»: :n шт. без ответа «Какой это телефон?»', ['n' => $unresolved]));
         }
         $rate = (string) (DB::table('exchange_rates')->where('organization_id', CurrentOrganization::instance()->requireId())->where('currency', 'USD')->orderByDesc('valid_from')->value('rate') ?? '0');
         $costs = $this->costsByImei();

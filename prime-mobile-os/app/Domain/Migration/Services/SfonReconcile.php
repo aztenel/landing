@@ -76,12 +76,14 @@ final class SfonReconcile
         if ($price) {
             $ch = DB::table('price_changes')->where('subject_type', 'variant')->where('subject_id', $variantId)->where('created_at', '>=', now()->subDays(3))->latest('id')->first();
 
-            return $ch ? __('смена цены :d у нас — не задублирована в sfon?', ['d' => Carbon::parse($ch->created_at)->format('d.m H:i')]) : __('причина не найдена, проверьте вручную');
+            return $ch ? __('смена цены :d у нас — не задублирована в sfon?', ['d' => Carbon::parse($ch->created_at)->format('d.m H:i')]) : __('вероятная причина не найдена — проверьте вручную');
         }
         $docs = DB::table('inventory_movements as im')->join('documents as d', 'd.id', '=', 'im.document_id')->join('stock_units as su', 'su.id', '=', 'im.stock_unit_id')
-            ->where('su.variant_id', $variantId)->where('im.occurred_at', '>=', now()->subDays(3))->where('d.status', 'posted')->distinct()->pluck('d.number');
+            ->where('su.variant_id', $variantId)->where('im.occurred_at', '>=', now()->subDays(3))->where('d.status', 'posted')
+            ->where('d.type', '!=', 'opening_balance') // the ВХО of day X itself is not a cause
+            ->distinct()->pluck('d.number');
 
-        return $docs->isNotEmpty() ? __('наши документы: :d — в sfon нет?', ['d' => $docs->take(3)->implode(', ')]) : __('причина не найдена, проверьте вручную');
+        return $docs->isNotEmpty() ? __('наши документы: :d — в sfon нет?', ['d' => $docs->take(3)->implode(', ')]) : __('вероятная причина не найдена — проверьте вручную');
     }
 
     public static function streak(): int

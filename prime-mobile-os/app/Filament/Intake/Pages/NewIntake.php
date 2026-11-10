@@ -18,6 +18,7 @@ use App\Support\Idempotency\Idempotency;
 use App\Support\Imei\Imei;
 use App\Support\Money\Currency;
 use App\Support\Money\Money;
+use App\Support\Tenancy\CurrentOrganization;
 use App\Support\Ui\Access;
 use App\Support\Ui\Hotkey;
 use App\Support\Ui\WorkingStore;
@@ -59,6 +60,14 @@ class NewIntake extends Page
     public string $accSearch = '';
 
     public ?string $error = null;
+
+    /** The last refused scan (ТЗ 07 сценарии 2–4): the message and, for a known IMEI, the code of its passport. */
+    public ?string $scanError = null;
+
+    public ?string $scanPassport = null;
+
+    /** ТЗ 07 сценарий 50: the IMEI is known in another firm — only a warning, without the firm's name. */
+    public ?string $scanWarning = null;
 
     public ?string $notice = null;
 
@@ -168,14 +177,33 @@ class NewIntake extends Page
                 }
             }
         }
+        $this->scanPassport = null;
         if (! $error && ($existing = UnitIdentifier::query()->where('value', $value)->first())) {
             $unit = StockUnit::query()->find($existing->stock_unit_id);
-            $error = __('Этот IMEI уже есть: :code, :status', ['code' => $unit?->public_code, 'status' => \App\Domain\Inventory\Enums\UnitStatus::labelOf($unit?->status)]);
+            $error = __('Этот IMEI уже есть: :code, статус «:status»', ['code' => $unit?->public_code, 'status' => \App\Domain\Inventory\Enums\UnitStatus::labelOf($unit?->status)]);
+            if ($unit && $unit->status === \App\Domain\Inventory\Enums\UnitStatus::Sold) {
+                // «… статус „продан“ 12.10.2026, Дана. Открыть паспорт?» — when and who, from the active sale line
+                $sold = \App\Domain\Sales\Models\SaleLine::query()->where('stock_unit_id', $unit->id)->latest('id')->first();
+                $doc = $sold ? \App\Domain\Ledger\Models\Document::query()->find($sold->document_id) : null;
+                if ($doc) {
+                    $error .= ' '.\Carbon\Carbon::parse($doc->occurred_at)->timezone(config('app.timezone'))->format('d.m.Y')
+                        .(($who = \App\Models\User::query()->whereKey($doc->created_by)->value('name')) ? ', '.$who : '');
+                }
+            }
+            $this->scanPassport = $unit?->public_code;
         }
-        $b['rows'][] = ['imei1' => $value, 'imei2' => null, 'error' => $error];
         if ($error) {
+            // the row is not added: the counter stays as it was, a double sound (ТЗ 07 сценарии 2–4)
+            $this->scanError = $error;
             $this->dispatch('pm-intake-bad');
+
+            return;
         }
+        $this->scanError = null;
+        $b['rows'][] = ['imei1' => $value, 'imei2' => null, 'error' => null];
+        $this->scanWarning = \Illuminate\Support\Facades\DB::table('unit_identifiers')->where('value', $value)
+            ->where('organization_id', '<>', CurrentOrganization::instance()->requireId())->exists()
+            ? __('IMEI :i встречается в другой фирме — проверьте происхождение телефона', ['i' => $value]) : null;
     }
 
     public function removeRow(int $batch, int $row): void
@@ -382,7 +410,7 @@ class NewIntake extends Page
                 }
             }
             foreach ($this->accessories as $a) {
-                $draft->accessory((int) $a['accessory_id'], max(1, (int) $a['qty']), Money::of($this->money($a['price']), $currency));
+                $draft->accessory((int) $a['accessory_id'], max(1, (int) $a['qty']), $canCost ? Money::of($this->money($a['price']), $currency) : null);
             }
             $total = $this->totals()['cost'];
             if ($canCost && $total > 0) {

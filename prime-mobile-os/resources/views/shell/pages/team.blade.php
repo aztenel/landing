@@ -24,7 +24,7 @@
 
     @if ($tab === 'staff' && $can['staff'])
         <div class="grid gap-4 xl:grid-cols-[1fr_360px]">
-            <div class="overflow-hidden rounded-xl border border-border bg-card">
+            <div class="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
                 <table class="w-full text-sm">
                     <thead class="bg-muted/60 text-left text-xs text-muted-foreground">
                         <tr><th class="px-4 py-2.5">{{ __('Сотрудник') }}</th><th class="px-4 py-2.5">{{ __('Роль') }}</th><th class="hidden px-4 py-2.5 md:table-cell">{{ __('Магазины') }}</th><th class="px-4 py-2.5">{{ __('Статус') }}</th><th class="px-4 py-2.5"></th></tr>
@@ -45,11 +45,11 @@
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     @unless ($r?->is_owner)
-                                        <div class="flex justify-end gap-1">
+                                        <div class="flex flex-col items-end gap-0.5 2xl:flex-row 2xl:justify-end 2xl:gap-1">
                                             @if ($m->status->value === 'active')
-                                                <button type="button" wire:click="staffAction({{ $m->id }}, 'password')" class="h-9 rounded-lg px-2.5 text-xs hover:bg-muted">{{ __('Сбросить пароль') }}</button>
-                                                @if (\App\Support\Ui\Access::isOwner())<button type="button" wire:click="staffAction({{ $m->id }}, '2fa')" wire:confirm="{{ __('Сбросить вход по коду? Сотрудник настроит его заново при следующем входе') }}" class="h-9 rounded-lg px-2.5 text-xs hover:bg-muted">{{ __('Сбросить код входа') }}</button>@endif
-                                                <button type="button" wire:click="staffAction({{ $m->id }}, 'block')" wire:confirm="{{ __('Заблокировать сотрудника? Он сразу потеряет доступ') }}" class="h-9 rounded-lg px-2.5 text-xs text-bad hover:bg-bad/10">{{ __('Заблокировать') }}</button>
+                                                <button type="button" wire:click="staffAction({{ $m->id }}, 'password')" class="h-9 whitespace-nowrap rounded-lg px-2.5 text-xs hover:bg-muted">{{ __('Сбросить пароль') }}</button>
+                                                @if (\App\Support\Ui\Access::isOwner())<button type="button" wire:click="staffAction({{ $m->id }}, '2fa')" wire:confirm="{{ __('Сбросить вход по коду? Сотрудник настроит его заново при следующем входе') }}" class="h-9 whitespace-nowrap rounded-lg px-2.5 text-xs hover:bg-muted">{{ __('Сбросить код входа') }}</button>@endif
+                                                <button type="button" wire:click="staffAction({{ $m->id }}, 'block')" wire:confirm="{{ __('Заблокировать сотрудника? Он сразу потеряет доступ') }}" class="h-9 whitespace-nowrap rounded-lg px-2.5 text-xs text-bad hover:bg-bad/10">{{ __('Заблокировать') }}</button>
                                             @elseif ($m->status->value === 'blocked')
                                                 <button type="button" wire:click="staffAction({{ $m->id }}, 'unblock')" class="h-9 rounded-lg px-2.5 text-xs hover:bg-muted">{{ __('Вернуть доступ') }}</button>
                                                 <button type="button" wire:click="staffAction({{ $m->id }}, 'dismiss')" wire:confirm="{{ __('Уволить? История продаж сохранится') }}" class="h-9 rounded-lg px-2.5 text-xs text-bad hover:bg-bad/10">{{ __('Уволить') }}</button>
@@ -65,6 +65,7 @@
                 </table>
             </div>
 
+            <div class="space-y-4">
             <form wire:submit="invite" class="space-y-3 rounded-xl border border-border bg-card p-4">
                 <h2 class="font-semibold">{{ __('Пригласить сотрудника') }}</h2>
                 <label class="block text-sm font-medium">{{ __('Имя и фамилия') }}
@@ -88,6 +89,37 @@
                 </fieldset>
                 <button type="submit" class="h-11 w-full rounded-lg bg-primary text-sm font-semibold text-white">{{ __('Получить ссылку-приглашение') }}</button>
             </form>
+
+            @if ($support || $hasIntegrator)
+                {{-- TZ 03 §13: the integrator sees the firm only with this access — look only, for 1 / 4 / 24 hours --}}
+                <div class="space-y-3 rounded-xl border border-border bg-card p-4" data-pm-support-card>
+                    <h2 class="font-semibold">{{ __('Техподдержка') }}</h2>
+                    @if ($support)
+                        <p class="text-sm">{{ __('Доступ открыт до :time', ['time' => $support->support_until->timezone(config('app.timezone'))->format('H:i')]) }}</p>
+                        <p class="text-sm text-muted-foreground">{{ $support->support_purpose }}</p>
+                        @if (\App\Support\Ui\Access::isOwner())
+                            <button type="button" wire:click="closeSupport" class="h-11 w-full rounded-lg border border-bad text-sm font-semibold text-bad">{{ __('Закрыть доступ') }}</button>
+                        @endif
+                    @else
+                        <p class="text-sm text-muted-foreground">{{ __('Интегратор будет только смотреть: без проведения документов, цен и ролей. Доступ закроется сам.') }}</p>
+                        <form wire:submit="grantSupport" class="space-y-3">
+                            <label class="block text-sm font-medium">{{ __('Что нужно сделать') }}
+                                <input type="text" wire:model="supportPurpose" required minlength="5" class="mt-1 w-full rounded-lg border-input bg-background text-base">
+                            </label>
+                            <label class="block text-sm font-medium">{{ __('На сколько') }}
+                                <select wire:model="supportHours" class="mt-1 w-full rounded-lg border-input bg-background text-base">
+                                    <option value="1">{{ __('1 час') }}</option><option value="4">{{ __('4 часа') }}</option><option value="24">{{ __('24 часа') }}</option>
+                                </select>
+                            </label>
+                            <label class="block text-sm font-medium">{{ __('Ваш пароль') }}
+                                <input type="password" wire:model="supportPassword" required autocomplete="current-password" class="mt-1 w-full rounded-lg border-input bg-background text-base">
+                            </label>
+                            <button type="submit" class="h-11 w-full rounded-lg bg-primary text-sm font-semibold text-white">{{ __('Открыть доступ') }}</button>
+                        </form>
+                    @endif
+                </div>
+            @endif
+            </div>
         </div>
     @endif
 

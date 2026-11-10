@@ -356,6 +356,8 @@
                         <button type="button" wire:click="addPayRow" class="{{ $btn }}">+ {{ __('Ещё способ') }}</button>
                         <button type="button" wire:click="settle" class="{{ $btn }}">{{ __('Свести под расчёт') }}</button>
                     </div>
+                    {{-- ТЗ 07 сценарий 42 / TZ 02 §3.4: the check is in tenge only; dollars go through «Обмен валюты» first --}}
+                    <p class="mt-2 text-xs text-muted-foreground">{{ __('Клиент платит долларами? Сначала обмен валюты в «Деньгах», потом оплата в ₸') }}</p>
                     @php($left = $this->payLeft())
                     <p class="mt-3 text-sm font-medium {{ $left === 0 ? 'text-ok' : 'text-bad' }}">
                         {{ $left === 0 ? __('Сходится ✓') : ($left > 0 ? __('Баланс не сведён: не хватает :s ₸', ['s' => number_format($left, 0, '', ' ')]) : __('Оплат больше, чем чек, на :s ₸', ['s' => number_format(-$left, 0, '', ' ')])) }}

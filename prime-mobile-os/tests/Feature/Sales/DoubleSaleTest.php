@@ -28,7 +28,7 @@ it('lets only one of two sales of the same IMEI pass, with a clear message', fun
     expect($a->isPosted())->toBeTrue();
 
     expect(fn () => app(Poster::class)->post($draftB, $w->seller2))
-        ->toThrow(PostingException::class, "Телефон уже продан ({$a->number}");
+        ->toThrow(PostingException::class, "Телефон только что продан (Айдар Продавец, {$a->number}");
 
     expect($draftB->refresh()->isDraft())->toBeTrue()
         ->and($w->balance('cash_kzt'))->toBe(Money::kzt(549000)->amount)

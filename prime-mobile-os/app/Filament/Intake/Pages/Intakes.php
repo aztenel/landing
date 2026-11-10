@@ -71,7 +71,7 @@ class Intakes extends Page
         $docs = Document::query()->where('type', 'purchase')
             ->when($this->tabName === 'posted', fn ($q) => $q->whereIn('status', ['posted', 'reversed']))
             ->when($this->tabName === 'drafts', fn ($q) => $q->where('status', 'draft'))
-            ->when($this->tabName === 'no_cost', fn ($q) => $q->where('status', 'posted')->whereIn('id', PurchaseLine::query()->where('line_type', 'unit')->whereNull('price')->select('document_id')))
+            ->when($this->tabName === 'no_cost', fn ($q) => $q->where('status', 'posted')->whereIn('id', PurchaseLine::query()->whereNull('price')->select('document_id')))
             ->when($this->supplier_id && $canSupplier, fn ($q) => $q->whereIn('id', Purchase::query()->where('supplier_id', $this->supplier_id)->select('document_id')))
             ->latest('id')->paginate(30);
         $purchases = Purchase::query()->whereIn('document_id', $docs->pluck('id'))->get()->keyBy('document_id');
@@ -84,7 +84,9 @@ class Intakes extends Page
             'suppliers' => $canSupplier ? Supplier::query()->orderBy('name')->pluck('name', 'id') : collect(),
             'canSupplier' => $canSupplier, 'canCost' => Access::allows('stock.view_cost'), 'canReverse' => Access::allows('doc.reverse'),
             'users' => \App\Models\User::query()->pluck('name', 'id'),
-            'noCost' => Document::query()->where('type', 'purchase')->where('status', 'posted')->whereIn('id', PurchaseLine::query()->where('line_type', 'unit')->whereNull('price')->select('document_id'))->count(),
+            'noCost' => Document::query()->where('type', 'purchase')->where('status', 'posted')->whereIn('id', PurchaseLine::query()->whereNull('price')->select('document_id'))->count(),
+            // ТЗ 07 сценарий 7: the rows of a seller's intake show «себестоимость не задана»
+            'noCostIds' => PurchaseLine::query()->whereNull('price')->whereIn('document_id', $docs->pluck('id'))->distinct()->pluck('document_id')->map(fn ($id) => (int) $id)->all(),
         ];
     }
 }

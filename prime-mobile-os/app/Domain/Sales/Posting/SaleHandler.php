@@ -186,7 +186,7 @@ class SaleHandler extends AbstractDocumentHandler
             }
             if ($method === PaymentMethodCode::Debt) {
                 if (! $p->debt_due_date) {
-                    throw PostingException::because('due_date_required', 'Укажите срок возврата долга');
+                    throw PostingException::because('due_date_required', 'Укажите дату возврата долга');
                 }
                 if ($p->debt_due_date->lt($ctx->businessDate())) {
                     throw PostingException::because('due_date_past', 'Срок долга не может быть в прошлом');
@@ -300,8 +300,14 @@ class SaleHandler extends AbstractDocumentHandler
                 $code = $ctx->locks->unit((int) $line->stock_unit_id)->public_code;
                 throw PostingException::because('cost_unknown', "Телефон {$code} ещё без себестоимости — продать нельзя. Сообщите администратору");
             }
+            if ($line->accessory_id && self::accessoryWithoutCost((int) $line->accessory_id)) {
+                // ТЗ 07 сценарий 7: accessories received by a seller without the purchase price would sell with cost 0 —
+                // the admin re-posts that intake with prices (Э11.1 «Отменить» → new intake), then they sell
+                $name = \App\Domain\Catalog\Models\Accessory::query()->whereKey($line->accessory_id)->value('name_ru');
+                throw PostingException::because('cost_unknown', "«{$name}»: нужна себестоимость — сообщите админу");
+            }
             if (! $line->is_gift && $amounts[$line->id] < $costs[$line->id]) {
-                $ctx->authorize('sale.below_cost', approvalType: 'below_cost', message: 'Нужно разрешение владельца: цена ниже допустимой');
+                $ctx->authorize('sale.below_cost', approvalType: 'below_cost', message: 'Цена ниже допустимой. Нужна заявка владельцу');
             }
         }
 
@@ -529,8 +535,8 @@ class SaleHandler extends AbstractDocumentHandler
                 $seller = $doc ? User::query()->find(Sale::query()->where('document_id', $doc->id)->value('seller_id'))?->name : null;
                 $when = $doc?->posted_at?->setTimezone($ctx->organization->timezone)->format('H:i');
                 throw PostingException::because('unit_sold', $doc
-                    ? "Телефон уже продан ({$doc->number}, {$when}, {$seller})"
-                    : 'Телефон уже продан', ['document_id' => $doc?->id]);
+                    ? "Телефон только что продан ({$seller}, {$doc->number}, {$when}). Уберите его из чека" // ТЗ 07 сценарий 13
+                    : 'Телефон уже продан. Уберите его из чека', ['document_id' => $doc?->id]);
             default:
                 throw PostingException::because('unit_not_sellable', "Телефон {$unit->public_code} нельзя продать: статус «".UnitStatus::labelOf($unit->status).'»');
         }
@@ -649,5 +655,13 @@ class SaleHandler extends AbstractDocumentHandler
     private function payments(Document $document): Collection
     {
         return SalePayment::query()->where('document_id', $document->id)->orderBy('id')->get();
+    }
+
+    /** An accessory of a posted, not reversed purchase line without a price (a seller's intake, ТЗ 03 §3.3 №31–32). */
+    public static function accessoryWithoutCost(int $accessoryId): bool
+    {
+        return \App\Domain\Inventory\Models\PurchaseLine::query()->where('accessory_id', $accessoryId)->whereNull('price')
+            ->whereIn('document_id', Document::query()->where('type', DocumentType::Purchase->value)->where('status', DocumentStatus::Posted->value)->select('id'))
+            ->exists();
     }
 }

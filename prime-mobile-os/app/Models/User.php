@@ -59,7 +59,8 @@ class User extends Authenticatable implements FilamentUser
     /** @return Collection<int, Organization> organizations where the membership is active */
     public function activeOrganizations(): Collection
     {
-        $ids = $this->memberships()->where('status', MembershipStatus::Active->value)->pluck('organization_id');
+        $ids = $this->memberships()->where('status', MembershipStatus::Active->value)
+            ->where(fn ($q) => $q->whereNull('support_until')->orWhere('support_until', '>', now()))->pluck('organization_id');
 
         return Organization::query()->whereIn('id', $ids)->where('is_active', true)->orderBy('name')->get();
     }
@@ -79,6 +80,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->memberships()
             ->where('memberships.status', MembershipStatus::Active->value)
+            ->where(fn ($q) => $q->whereNull('memberships.support_until')->orWhere('memberships.support_until', '>', now()))
             ->whereExists(fn ($q) => $q->from('organizations')
                 ->whereColumn('organizations.id', 'memberships.organization_id')
                 ->where('organizations.is_active', true));

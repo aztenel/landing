@@ -60,7 +60,7 @@
                                     @if (! $l->stock_unit_id && $l->qty > 1)<label class="text-xs">{{ __('Кол-во (из :n)', ['n' => $left]) }}<input type="number" min="1" max="{{ $left }}" wire:model.live="pick.{{ $l->id }}.qty" class="{{ $input }} num"></label>@endif
                                     <label class="text-xs">{{ __('Причина') }}<select wire:model="pick.{{ $l->id }}.reason" class="{{ $input }}">
                                         <option value="defect">{{ __('брак') }}</option>
-                                        @unless ($l->stock_unit_id)<option value="not_fit">{{ __('не подошёл') }}</option>@endunless
+                                        <option value="not_fit">{{ __('не подошёл') }}</option>
                                         <option value="online">{{ __('онлайн-покупка ≤ 14 дней') }}</option><option value="seller_error">{{ __('ошибка продавца') }}</option><option value="owner">{{ __('по решению владельца') }}</option>
                                     </select></label>
                                     @if ($l->stock_unit_id)
@@ -108,13 +108,16 @@
                 @endif
                 <label class="mt-3 block text-sm">{{ __('Комментарий') }}<input type="text" wire:model="comment" class="{{ $input }}"></label>
 
+                @if ($lawHint)
+                    <p class="mt-3 rounded-lg bg-warn/10 px-3 py-2 text-sm" role="note">{{ __(\App\Filament\Sales\Pages\Returns::LAW_HINT) }}</p>
+                @endif
                 <div class="mt-4 flex flex-wrap items-center justify-end gap-2">
                     <button type="button" wire:click="$set('step', 2)" class="h-11 rounded-lg border border-border px-4 text-sm">{{ __('Назад') }}</button>
                     @if ($request && $request->status->value === 'pending')
                         <span wire:poll.3s="pollRequest" class="text-sm text-muted-foreground">{{ __('Заявка отправлена. Ждём ответа владельца…') }}</span>
                     @elseif ($request && $request->status->value === 'rejected')
                         <span class="text-sm text-bad">{{ __('Отклонено') }}{{ $request->decision_comment ? ': «'.$request->decision_comment.'»' : '' }}</span>
-                    @elseif ($canPost && $step === 3)
+                    @elseif ($canPost && $step === 3 && ! ($lawHint && ! \App\Support\Ui\Access::isOwner()))
                         <button type="button" wire:click="post" wire:loading.attr="disabled" class="h-11 rounded-lg bg-primary px-6 text-sm font-semibold text-white">{{ $exchange ? __('Провести обмен') : __('Провести возврат') }}</button>
                     @else
                         <button type="button" wire:click="sendRequest" class="h-11 rounded-lg bg-primary px-6 text-sm font-semibold text-white">{{ __('Отправить заявку') }}</button>

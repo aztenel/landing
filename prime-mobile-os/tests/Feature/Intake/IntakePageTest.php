@@ -29,19 +29,12 @@ it('receives phones in $ by scanning one after another: Luhn, duplicate, already
         ->set('head.supplier_id', $w->supplier->id)->set('head.currency', 'USD')->set('head.pay', 'credit')->set('head.due', now()->addDays(14)->toDateString())
         ->call('pickVariant', 0, $w->iphone->id)->set('batches.0.price', '1140')->set('batches.0.sale_price', '649000')->set('batches.0.expected', '3')
         ->call('scan', imeiN(1))->call('scan', imeiN(2))
-        ->call('scan', imeiN(1))                                 // duplicate
-        ->call('scan', '356938124471200')                        // bad check digit (unless it happens to be right)
-        ->call('scan', $existing->imei1);                        // already in the base
-    $rows = $page->get('batches')[0]['rows'];
-    expect($rows[2]['error'])->toContain('Уже отсканирован')
-        ->and($rows[4]['error'])->toContain('уже есть');
+        ->call('scan', imeiN(1))->assertSet('scanError', fn ($e) => str_contains((string) $e, 'Уже отсканирован в этой партии (строка 1)'))
+        ->call('scan', '356789012345671')->assertSet('scanError', fn ($e) => str_contains((string) $e, 'IMEI с ошибкой'))
+        ->call('scan', $existing->imei1)->assertSet('scanError', fn ($e) => str_contains((string) $e, 'уже есть'))
+        ->assertSee('Открыть паспорт?');
+    expect($page->get('batches')[0]['rows'])->toHaveCount(2); // refused scans are not rows
 
-    $page->call('askConfirm')->assertSet('error', fn ($e) => str_contains((string) $e, 'ошибками'));
-    foreach ([4, 3, 2] as $r) {
-        if ($page->get('batches')[0]['rows'][$r]['error'] ?? null) {
-            $page->call('removeRow', 0, $r);
-        }
-    }
     $page->call('askConfirm')->assertSet('error', null)->assertSet('confirm', true)->call('post')->assertSet('error', null);
 
     $doc = Document::query()->where('type', 'purchase')->where('status', 'posted')->firstOrFail();

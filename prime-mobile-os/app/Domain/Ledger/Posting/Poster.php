@@ -177,6 +177,10 @@ class Poster
         if (! $membership || ! $membership->isActive()) {
             throw AccessDenied::because('access_denied', 'Доступ закрыт. Обратитесь к владельцу');
         }
+        if ($actor->is_superadmin || $membership->support_until !== null) {
+            // TZ 03 §13 п. 4: the integrator under a support access never posts documents — the owner or the admin does
+            throw AccessDenied::because('support_cannot_post', 'Техподдержка не проводит документы');
+        }
         if ($doc->store_id === null) {
             return;
         }

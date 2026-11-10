@@ -50,9 +50,11 @@ final class CustomerReturnDraft extends DraftBuilder
         return DocumentType::CustomerReturn;
     }
 
-    public function line(SaleLine|int $saleLine, int $qty = 1, UnitStatus|string $unitStatusAfter = UnitStatus::InStock, ?Money $amount = null): self
+    /** @param  string|null  $reason  defect | not_fit | online | seller_error | owner — «not_fit» of a phone needs the owner */
+    public function line(SaleLine|int $saleLine, int $qty = 1, UnitStatus|string $unitStatusAfter = UnitStatus::InStock, ?Money $amount = null, ?string $reason = null): self
     {
         $this->lines[] = [
+            'reason' => $reason,
             'sale_line_id' => $saleLine instanceof SaleLine ? $saleLine->id : $saleLine,
             'qty' => $qty,
             'unit_status_after' => $unitStatusAfter instanceof UnitStatus ? $unitStatusAfter->value : $unitStatusAfter,

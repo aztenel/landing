@@ -10,6 +10,7 @@
     $livewire ??= null;
     $navigation = filament()->getNavigation();
     $scopes = $livewire?->getRenderHookScopes();
+    $pmSupport = \App\Domain\Tenancy\Services\IntegratorAccess::active();
     $hotkeys = ($livewire && method_exists($livewire, 'hotkeys')) ? $livewire->hotkeys() : [];
 @endphp
 
@@ -18,6 +19,13 @@
         @include('shell.layout.sidebar', ['navigation' => $navigation])
 
         <div class="flex min-w-0 flex-1 flex-col">
+            @if ($pmSupport)
+                {{-- TZ 03 §13: everybody sees that the integrator is inside and until when --}}
+                <div class="pm-safe-x flex min-h-10 items-center gap-2 bg-warn/15 py-2 text-[13px] font-medium text-foreground" role="status" data-pm-support>
+                    <x-ui::icon name="shield" class="h-4 w-4 shrink-0" />
+                    <span>{{ __('Идёт техподдержка до :time', ['time' => $pmSupport->support_until->timezone(config('app.timezone'))->format('H:i')]) }}</span>
+                </div>
+            @endif
             {{ FilamentView::renderHook(\App\Support\Ui\ShellHook::BANNER, scopes: $scopes) }}
             @include('shell.layout.topbar')
             @include('shell.layout.mobile-header')

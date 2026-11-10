@@ -76,9 +76,7 @@ class PurchaseHandler extends AbstractDocumentHandler
                 if (! $line->accessory_id || $line->qty <= 0) {
                     throw PostingException::because('bad_line', 'Строка аксессуара: укажите товар и количество');
                 }
-                if ($line->price === null) {
-                    throw PostingException::because('price_required', 'Укажите цену закупа аксессуара');
-                }
+                // price null = a seller's intake (ТЗ 07 сценарий 7): received, but not sold until the admin re-posts it with prices
             } elseif ($line->line_type !== 'unit') {
                 throw PostingException::because('bad_line', 'Неизвестный тип строки');
             }

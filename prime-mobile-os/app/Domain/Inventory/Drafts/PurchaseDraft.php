@@ -68,13 +68,14 @@ final class PurchaseDraft extends DraftBuilder
         return $this;
     }
 
-    public function accessory(Accessory|int $accessory, int $qty, Money $price): self
+    /** $price null — a seller's intake without the purchase price: such accessories do not sell until it is entered. */
+    public function accessory(Accessory|int $accessory, int $qty, ?Money $price): self
     {
         $this->lines[] = [
             'line_type' => 'accessory',
             'accessory_id' => $accessory instanceof Accessory ? $accessory->id : $accessory,
             'qty' => $qty,
-            'price' => $this->amount($price),
+            'price' => $price === null ? null : $this->amount($price),
         ];
 
         return $this;
