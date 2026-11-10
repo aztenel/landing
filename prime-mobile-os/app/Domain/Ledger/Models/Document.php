@@ -44,6 +44,7 @@ class Document extends Model
             'type' => DocumentType::class,
             'status' => DocumentStatus::class,
             'occurred_at' => 'datetime',
+            'occurred_at_manual' => 'boolean',
             'posted_at' => 'datetime',
             'exchange_rate_manual' => 'boolean',
             'meta' => 'array',

@@ -40,7 +40,7 @@ it('reverses a sale: unit back in stock, money and bonuses back, line inactive (
 
     expect($reversal->number)->toStartWith('СТН-')
         ->and($reversal->reversal_of_document_id)->toBe($sale->id)
-        ->and($reversal->occurred_at->equalTo($sale->occurred_at))->toBeTrue()   // same day: report of that day is corrected
+        ->and($reversal->occurred_at->greaterThanOrEqualTo($sale->occurred_at))->toBeTrue()   // its own date (audit №27)
         ->and($sale->refresh()->status)->toBe(DocumentStatus::Reversed)
         ->and($sale->reversed_by_document_id)->toBe($reversal->id)
         ->and($unit->refresh()->status)->toBe(UnitStatus::InStock)

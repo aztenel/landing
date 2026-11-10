@@ -121,6 +121,7 @@ abstract class DraftBuilder
                 'status' => DocumentStatus::Draft->value,
                 'store_id' => $this->storeId,
                 'occurred_at' => $this->occurredAt ?? now(),
+                'occurred_at_manual' => $this->occurredAt !== null,
                 'idempotency_key' => $this->idempotencyKey ?? Idempotency::newKey(),
                 'comment' => $this->comment,
                 'reason_text' => $this->reasonText,

@@ -75,6 +75,10 @@ class Poster
             }
 
             $now = CarbonImmutable::now();
+            if (! $doc->occurred_at_manual) {
+                // nobody chose the date: the document happens when it is posted (audit №19), not when the draft was made
+                $doc->forceFill(['occurred_at' => $now])->save();
+            }
             $ctx = new PostingContext($doc, $actor, $organization, $now, $this->access, $this->approvals);
 
             $this->checkActorAndStore($doc, $actor);

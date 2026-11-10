@@ -37,7 +37,7 @@ use Illuminate\Support\Facades\DB;
  *  - right doc.reverse with limit L18 (days since posting);
  *  - forbidden if a unit of the document changed afterwards (its last movement belongs to another document) or
  *    the handler reports dependants (assertReversible), money/bonus balances would go below zero, etc.;
- *  - entries get the business date of the original if its period is open, otherwise today (closed period).
+ *  - entries always get the date of the reversal itself (audit №27, docs/audit/decisions.md).
  */
 class Reverser
 {
@@ -82,7 +82,9 @@ class Reverser
             }
 
             $now = CarbonImmutable::now();
-            $occurredAt = $this->periods->isOpen(CarbonImmutable::parse($orig->occurred_at)) ? $orig->occurred_at : $now;
+            // a reversal always has its own date — the moment of the reversal (audit №27): past days, closed shifts and
+            // reports already sent never change; the money goes out of today's cash
+            $occurredAt = $now;
 
             $reversal = new Document;
             $reversal->forceFill([
