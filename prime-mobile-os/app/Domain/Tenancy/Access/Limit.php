@@ -75,7 +75,7 @@ enum Limit: string
             self::DiscountPerCheck => ['admin' => $kzt(30000), 'senior_seller' => $kzt(15000), 'seller' => $kzt(5000)],
             self::DiscountPercentPerCheck => ['admin' => $pct(7), 'senior_seller' => $pct(5), 'seller' => $pct(3)],
             self::DiscountPerDay => ['admin' => $kzt(150000), 'senior_seller' => $kzt(50000), 'seller' => $kzt(20000)],
-            self::CustomerDebtTotal => ['admin' => $kzt(1000000), 'senior_seller' => $kzt(300000), 'seller' => $kzt(100000)],
+            self::CustomerDebtTotal => ['admin' => $kzt(300000), 'senior_seller' => $kzt(300000), 'seller' => $kzt(100000)],
             self::CustomerDebtDays => ['admin' => 90, 'senior_seller' => 30, 'seller' => 30],
             self::DebtWithoutHistory => ['senior_seller' => 0, 'seller' => 0],
             self::ReturnAccessory => ['senior_seller' => $kzt(30000), 'seller' => 0],

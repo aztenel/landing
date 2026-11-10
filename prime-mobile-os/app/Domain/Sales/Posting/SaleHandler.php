@@ -488,6 +488,12 @@ class SaleHandler extends AbstractDocumentHandler
         $after = (int) $balance->balance + $debtPaid;
         $ctx->authorize('sale.credit', Limit::CustomerDebtTotal, $after, 'debt',
             'Долг клиента станет '.Money::kztMinor($after)->format().' — нужно разрешение владельца');
+        // firm ceiling (audit №17): the smaller of the role/personal limit and the ceiling applies; above it — owner only
+        $ceiling = $ctx->settings()->customerDebtCeiling();
+        if ($ceiling > 0 && $after > $ceiling) {
+            $ctx->requireApprovalUnlessOwner('sale.credit', 'debt_over_ceiling',
+                'Долг клиента станет '.Money::kztMinor($after)->format().' — больше потолка фирмы '.Money::kztMinor($ceiling)->format().'. Разрешает только владелец');
+        }
 
         $due = $payments->firstWhere('method', PaymentMethodCode::Debt)->debt_due_date;
         $days = (int) abs($ctx->businessDate()->diffInDays(CarbonImmutable::parse($due->format('Y-m-d'), $ctx->organization->timezone)));

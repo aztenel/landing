@@ -215,3 +215,21 @@ it('pays with bonuses FIFO within 20 % of the check', function () {
     expect((int) $balance->available)->toBe(1000)
         ->and((int) $balance->pending)->toBe(870); // 3 % of (36 000 − 7 000)
 });
+
+it('keeps one customer under the firm debt ceiling of 300 000 ₸ unless the owner allows (audit №17)', function () {
+    $w = world();
+    SaleDraft::make($w->store, $w->owner)->customer($w->customer)->unit($w->phone(), Money::kzt(900000))
+        ->cash(Money::kzt(650000))->debt(Money::kzt(250000), now()->addDays(10))->post($w->owner);
+
+    // the admin sells 80 000 more on credit: 330 000 > 300 000 → approval of the owner, even with a higher role limit L4
+    \App\Domain\Tenancy\Models\RoleLimit::query()->where('code', 'L4')
+        ->whereIn('role_id', \Spatie\Permission\Models\Role::query()->where('organization_id', $w->org->id)->where('name', 'admin')->pluck('id'))
+        ->update(['value' => Money::kzt(1000000)->amount]);
+    expect(fn () => SaleDraft::make($w->store, $w->admin)->customer($w->customer)->unit($w->phone(), Money::kzt(900000))
+        ->cash(Money::kzt(820000))->debt(Money::kzt(80000), now()->addDays(10))->post($w->admin))
+        ->toThrow(ApprovalRequired::class, 'потолка фирмы');
+
+    // the owner may
+    expect(SaleDraft::make($w->store, $w->owner)->customer($w->customer)->unit($w->phone(), Money::kzt(900000))
+        ->cash(Money::kzt(820000))->debt(Money::kzt(80000), now()->addDays(10))->post($w->owner)->isPosted())->toBeTrue();
+});

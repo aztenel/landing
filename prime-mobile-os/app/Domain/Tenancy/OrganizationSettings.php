@@ -28,6 +28,7 @@ final class OrganizationSettings
             'imei_check_max_age_days' => 7,
             'reservation_minutes' => 30,
             'order_hold_days' => 3,
+            'customer_debt_ceiling' => 30000000,          // tiyn (300 000 ₸): above it only the owner (audit №17)
         ],
         'documents' => [
             'backdate_max_days' => 3,
@@ -70,6 +71,12 @@ final class OrganizationSettings
     public function accent(): string
     {
         return $this->data['accent'];
+    }
+
+    /** Firm ceiling of one customer's total debt, tiyn (audit №17): above it only the owner allows. */
+    public function customerDebtCeiling(): int
+    {
+        return (int) $this->get('sales.customer_debt_ceiling');
     }
 
     public function bonusEnabled(): bool
