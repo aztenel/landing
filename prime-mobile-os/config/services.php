@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    /*
+     | sfon Open API (TZ 07 §1, только для переноса): ключ кладётся ТОЛЬКО в .env сервера (SFON_API_KEY), не в репозиторий.
+     */
+    'sfon' => [
+        'url' => env('SFON_API_URL', 'https://open-api.sfon.kz/open-api'),
+        'key' => env('SFON_API_KEY'),
+        'pause_ms' => 500,          // не чаще 2 запросов в секунду
+    ],
+
 ];

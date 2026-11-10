@@ -16,6 +16,7 @@ use App\Domain\Storefront\Models\SitePhoto;
 use App\Domain\Storefront\Services\Leads;
 use App\Domain\Storefront\Services\ListingBuilder;
 use App\Domain\Storefront\Services\Photos;
+use App\Domain\Storefront\Services\Promotions;
 use App\Domain\Storefront\Services\SitePages;
 use App\Domain\Storefront\Services\SiteSettings;
 use App\Domain\Storefront\Services\Visibility;
@@ -58,7 +59,7 @@ class Site extends Page
     public const TABS = [
         'goods' => ['Товары', 'site.visibility'], 'nophoto' => ['Без фото', 'site.photo'], 'review' => ['Новые фото', 'site.visibility'],
         'leads' => ['Заявки', 'site.leads'], 'rules' => ['Категории и магазины', 'site.rules'], 'pages' => ['Страницы', 'site.content'],
-        'banners' => ['Баннеры', 'site.content'], 'settings' => ['Настройки', 'site.settings'], 'state' => ['Состояние', null], 'stats' => ['Статистика', null],
+        'banners' => ['Баннеры', 'site.content'], 'promos' => ['Акции', 'price.bulk'], 'settings' => ['Настройки', 'site.settings'], 'state' => ['Состояние', null], 'stats' => ['Статистика', null],
     ];
 
     public string $tab = 'goods';
@@ -80,6 +81,10 @@ class Site extends Page
     public array $pageForm = [];
 
     public ?array $banner = null;
+
+    public ?array $promo = null;
+
+    public ?int $previewId = null;
 
     public array $settings = [];
 
@@ -356,6 +361,68 @@ class Site extends Page
         $this->done(__('Баннер удалён'));
     }
 
+    // ---- Акции (§6.3) ----
+
+    public function newPromo(): void
+    {
+        Access::authorize('price.bulk');
+        $this->promo = ['name_ru' => '', 'name_kk' => '', 'label_ru' => '', 'label_kk' => '', 'starts_at' => now()->addDay()->format('Y-m-d\\T00:00'), 'ends_at' => now()->addDays(4)->format('Y-m-d\\T23:59'),
+            'type_code' => '', 'model_ids' => [], 'condition' => '', 'codes' => '', 'discount_type' => 'percent', 'discount_value' => '5', 'rounding' => 1000, 'show_old' => true];
+        $this->previewId = null;
+    }
+
+    private function promoRow(): array
+    {
+        $f = $this->promo;
+
+        return ['name_ru' => trim($f['name_ru']), 'name_kk' => trim($f['name_kk']) ?: null, 'label_ru' => mb_substr(trim($f['label_ru']), 0, 40) ?: null, 'label_kk' => mb_substr(trim($f['label_kk']), 0, 40) ?: null,
+            'starts_at' => Carbon::parse($f['starts_at'], CurrentOrganization::instance()->require()->timezone)->utc(), 'ends_at' => Carbon::parse($f['ends_at'], CurrentOrganization::instance()->require()->timezone)->utc(),
+            'filter' => json_encode(array_filter(['type_code' => $f['type_code'] ?: null, 'model_ids' => array_map('intval', (array) $f['model_ids']) ?: null, 'condition' => $f['condition'] ?: null,
+                'codes' => array_values(array_filter(array_map('trim', preg_split('/[\\s,]+/', mb_strtoupper((string) $f['codes']))))) ?: null])),
+            'discount_type' => in_array($f['discount_type'], ['percent', 'amount', 'fixed'], true) ? $f['discount_type'] : 'percent', 'discount_value' => (float) str_replace(',', '.', (string) $f['discount_value']),
+            'rounding' => in_array((int) $f['rounding'], [1, 100, 1000], true) ? (int) $f['rounding'] : 1000, 'show_old' => (bool) $f['show_old']];
+    }
+
+    /** «Предпросмотр» builds the table; «Запланировать» saves the promotion (the start is by the clock). */
+    public function previewPromo(): void
+    {
+        Access::authorize('price.bulk');
+        $this->error = trim((string) $this->promo['name_ru']) === '' ? __('Введите название') : null;
+        if (! $this->error && (float) str_replace(',', '.', (string) $this->promo['discount_value']) <= 0) {
+            $this->error = __('Введите скидку');
+        }
+        $this->previewId = $this->error ? null : 1;
+    }
+
+    public function savePromo(): void
+    {
+        Access::authorize('price.bulk');
+        $row = $this->promoRow();
+        if ($row['name_ru'] === '' || $row['ends_at']->lte($row['starts_at'])) {
+            $this->error = __('Проверьте название и период');
+
+            return;
+        }
+        DB::table('promotions')->insert($row + ['organization_id' => CurrentOrganization::instance()->requireId(), 'status' => 'planned', 'created_by' => auth()->id(), 'created_at' => now(), 'updated_at' => now()]);
+        activity('site')->causedBy(auth()->user())->withProperties(['promotion' => $row['name_ru']])->log('promotion.planned');
+        $this->promo = null;
+        $this->previewId = null;
+        app(Promotions::class)->tick();   // a promotion that starts now starts at once
+        $this->done(__('Акция запланирована'));
+    }
+
+    public function cancelPromo(int $id): void
+    {
+        Access::authorize('price.bulk');
+        $p = DB::table('promotions')->where('organization_id', CurrentOrganization::instance()->requireId())->where('id', $id)->first();
+        abort_unless($p, 404);
+        if ($p->status === 'active') {
+            app(Promotions::class)->finish($id);
+        }
+        DB::table('promotions')->where('id', $id)->where('status', 'planned')->update(['status' => 'cancelled', 'updated_at' => now()]);
+        $this->done(__('Акция остановлена'));
+    }
+
     // ---- Настройки (§12.4) ----
 
     private function loadSettings(): void
@@ -444,6 +511,10 @@ class Site extends Page
                 'stores' => Store::query()->where('is_active', true)->orderBy('sort')->get()],
             'pages' => ['pages' => SitePage::query()->get()->keyBy('slug')],
             'banners' => ['banners' => Banner::query()->orderBy('sort')->orderBy('id')->get(), 'models' => ProductModel::query()->whereIn('id', Listing::query()->select('model_ref'))->orderBy('name_ru')->get()],
+            'promos' => ['promos' => DB::table('promotions')->where('organization_id', CurrentOrganization::instance()->requireId())->orderByDesc('id')->limit(30)->get(),
+                'models' => ProductModel::query()->whereIn('id', StockUnit::query()->join('variants', 'variants.id', '=', 'stock_units.variant_id')->whereIn('stock_units.status', ['in_stock', 'reserved', 'ordered'])->select('variants.model_id'))->orderBy('name_ru')->get(),
+                'types' => ProductType::query()->orderBy('sort')->get(),
+                'preview' => $this->promo && $this->previewId ? app(Promotions::class)->preview((object) $this->promoRow()) : collect()],
             'state' => $this->stateData(),
             'stats' => $this->statsData(),
             default => [],

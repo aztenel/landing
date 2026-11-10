@@ -6,10 +6,16 @@ use App\Domain\Inventory\Enums\UnitStatus;
 use App\Domain\Inventory\Models\StockUnit;
 use App\Domain\Inventory\Models\UnitIdentifier;
 use App\Domain\Storefront\Services\Leads;
+use App\Filament\Migration\Pages\Migration;
+use App\Filament\Sales\Pages\Sales;
 use App\Filament\Site\Pages\Site;
+use App\Support\Money\Money;
+use App\Support\Tenancy\CurrentOrganization;
+use Carbon\Carbon;
 use Filament\GlobalSearch\Contracts\GlobalSearchProvider;
 use Filament\GlobalSearch\GlobalSearchResult;
 use Filament\GlobalSearch\GlobalSearchResults;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Topbar search of the ERP (TZ 04 §0.2): a PM code or IMEI opens the phone passport, a site request code «СЗ-2041»
@@ -34,6 +40,18 @@ final class ErpSearch implements GlobalSearchProvider
             if ($units->isNotEmpty()) {
                 $results->category(__('Телефоны'), $units->map(fn ($u) => new GlobalSearchResult($u->public_code.' · '.$u->variant?->title(),
                     route('erp.stock.units.show', ['code' => $u->public_code]), [__('Статус') => UnitStatus::labelOf($u->status)]))->all());
+            }
+        }
+
+        // the history from sfon (TZ 07 §1.10): «Продан в sfon 12.03.2025, гарантия до …»
+        $digits = preg_replace('/\D/', '', $q);
+        if (strlen($digits) === 15 && Access::allows('stock.passport')) {
+            $old = DB::table('sfon_archive')->where('organization_id', CurrentOrganization::instance()->requireId())
+                ->where('imei', $digits)->orderByDesc('occurred_at')->limit(3)->get();
+            if ($old->isNotEmpty()) {
+                $results->category(__('Архив sfon'), $old->map(fn ($a) => new GlobalSearchResult(__('Продан в sfon :d', ['d' => $a->occurred_at ? Carbon::parse($a->occurred_at)->format('d.m.Y') : '']).' · '.$a->title,
+                    Access::isOwner() ? Migration::getUrl().'?tab=archive' : Sales::getUrl(),
+                    [__('Чек') => (string) $a->number, __('Сумма') => Money::kztMinor((int) $a->amount)->format()]))->all());
             }
         }
 

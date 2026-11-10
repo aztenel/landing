@@ -269,6 +269,50 @@
             </ul>
         @endif
 
+    @elseif ($tab === 'promos')
+        @if ($promo)
+            <div class="space-y-3 rounded-xl border border-border bg-card p-4 text-sm">
+                <div class="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 desk:grid-cols-4">
+                    <label>{{ __('Название (рус)') }}<input type="text" wire:model="promo.name_ru" placeholder="{{ __('Чёрная пятница') }}" class="{{ $input }} mt-1 w-full"></label>
+                    <label>{{ __('Атауы (қаз)') }}<input type="text" wire:model="promo.name_kk" class="{{ $input }} mt-1 w-full"></label>
+                    <label>{{ __('Метка на карточке (рус)') }}<input type="text" maxlength="40" wire:model="promo.label_ru" class="{{ $input }} mt-1 w-full"></label>
+                    <label>{{ __('Метка (қаз)') }}<input type="text" maxlength="40" wire:model="promo.label_kk" class="{{ $input }} mt-1 w-full"></label>
+                    <label>{{ __('С') }}<input type="datetime-local" wire:model="promo.starts_at" class="{{ $input }} mt-1 w-full"></label>
+                    <label>{{ __('По') }}<input type="datetime-local" wire:model="promo.ends_at" class="{{ $input }} mt-1 w-full"></label>
+                    <label>{{ __('Категория') }}<select wire:model="promo.type_code" class="{{ $input }} mt-1 w-full"><option value="">{{ __('все') }}</option>@foreach ($types as $t)<option value="{{ $t->code }}">{{ $t->name_ru }}</option>@endforeach</select></label>
+                    <label>{{ __('Новые / б/у') }}<select wire:model="promo.condition" class="{{ $input }} mt-1 w-full"><option value="">{{ __('все') }}</option><option value="new">{{ __('новые') }}</option><option value="used">{{ __('б/у') }}</option></select></label>
+                    <label class="sm:col-span-2">{{ __('Модели (можно несколько)') }}<select multiple wire:model="promo.model_ids" class="{{ $input }} mt-1 h-28 w-full">@foreach ($models as $m)<option value="{{ $m->id }}">{{ $m->name_ru }}</option>@endforeach</select></label>
+                    <label class="sm:col-span-2">{{ __('Или конкретные коды PM через запятую') }}<input type="text" wire:model="promo.codes" class="{{ $input }} mt-1 w-full"></label>
+                    <label>{{ __('Скидка') }}<select wire:model="promo.discount_type" class="{{ $input }} mt-1 w-full"><option value="percent">%</option><option value="amount">{{ __('сумма ₸') }}</option><option value="fixed">{{ __('фикс. цена ₸') }}</option></select></label>
+                    <label>{{ __('Значение') }}<input type="text" inputmode="decimal" wire:model="promo.discount_value" class="{{ $input }} mt-1 w-full"></label>
+                    <label>{{ __('Округление вниз до') }}<select wire:model="promo.rounding" class="{{ $input }} mt-1 w-full"><option value="1000">1 000 ₸</option><option value="100">100 ₸</option><option value="1">{{ __('без') }}</option></select></label>
+                    <label class="flex items-center gap-2 pt-6"><input type="checkbox" wire:model="promo.show_old" class="rounded border-input text-primary">{{ __('Показывать старую цену') }}</label>
+                </div>
+                <div class="flex gap-2"><button type="button" wire:click="previewPromo" class="{{ $btn }}">{{ __('Предпросмотр') }}</button><button type="button" wire:click="savePromo" class="{{ $primary }}">{{ __('Запланировать') }}</button><button type="button" wire:click="$set('promo', null)" class="{{ $btn }}">{{ __('Отмена') }}</button></div>
+                @if ($preview->isNotEmpty())
+                    <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-xs text-muted-foreground"><tr class="border-b border-border"><th class="px-2 py-1">{{ __('Код') }}</th><th class="px-2 py-1">{{ __('Телефон') }}</th><th class="px-2 py-1 text-right">{{ __('Было') }}</th><th class="px-2 py-1 text-right">{{ __('Станет') }}</th>@if (\App\Support\Ui\Access::allows('stock.view_cost'))<th class="px-2 py-1 text-right">{{ __('Себестоимость') }}</th>@endif</tr></thead>
+                        <tbody class="divide-y divide-border">@foreach ($preview as $r)<tr class="{{ $r['below'] && \App\Support\Ui\Access::allows('stock.view_cost') ? 'text-bad' : '' }}"><td class="num px-2 py-1">{{ $r['unit']->public_code }}</td><td class="px-2 py-1">{{ $r['unit']->variant?->title() }}</td>
+                            <td class="num px-2 py-1 text-right">{{ \App\Support\Money\Money::kztMinor($r['before'])->format() }}</td><td class="num px-2 py-1 text-right font-semibold">{{ \App\Support\Money\Money::kztMinor($r['new'])->format() }}</td>
+                            @if (\App\Support\Ui\Access::allows('stock.view_cost'))<td class="num px-2 py-1 text-right">{{ $r['cost'] === null ? '—' : \App\Support\Money\Money::kztMinor($r['cost'])->format() }}@if ($r['below']) · {{ __('ниже себестоимости') }}@endif</td>@endif</tr>@endforeach</tbody></table></div>
+                @elseif ($previewId)
+                    <p class="text-muted-foreground">{{ __('Под условия не попал ни один телефон') }}</p>
+                @endif
+            </div>
+        @else
+            <button type="button" wire:click="newPromo" class="{{ $primary }}"><x-ui::icon name="plus" class="h-4 w-4" />{{ __('Акция') }}</button>
+            <ul class="divide-y divide-border rounded-xl border border-border bg-card">
+                @forelse ($promos as $p)
+                    <li class="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+                        <span class="min-w-0 flex-1"><b>{{ $p->name_ru }}</b> <span class="text-muted-foreground">{{ \Carbon\Carbon::parse($p->starts_at)->setTimezone($tz)->format('d.m H:i') }} – {{ \Carbon\Carbon::parse($p->ends_at)->setTimezone($tz)->format('d.m H:i') }} · {{ $p->discount_type === 'percent' ? '−'.(float) $p->discount_value.'%' : ($p->discount_type === 'amount' ? '−'.number_format((float) $p->discount_value, 0, '', ' ').' ₸' : number_format((float) $p->discount_value, 0, '', ' ').' ₸') }}</span></span>
+                        <span class="rounded bg-muted px-2 py-0.5 text-xs">{{ ['planned' => __('запланирована'), 'active' => __('идёт'), 'finished' => __('закончилась'), 'cancelled' => __('отменена')][$p->status] ?? $p->status }}</span>
+                        @if (in_array($p->status, ['planned', 'active'], true))<button type="button" wire:click="cancelPromo({{ $p->id }})" wire:confirm="{{ __('Остановить акцию? Цены вернутся.') }}" class="{{ $btn }} h-9 text-bad">{{ __('Остановить') }}</button>@endif
+                    </li>
+                @empty
+                    <li class="p-6 text-center text-sm text-muted-foreground">{{ __('Акций нет') }}</li>
+                @endforelse
+            </ul>
+        @endif
+
     @elseif ($tab === 'settings')
         <div class="space-y-4 rounded-xl border border-border bg-card p-4 text-sm">
             <label class="flex items-center gap-2 text-base font-semibold"><input type="checkbox" wire:model="settings.enabled" class="rounded border-input text-primary">{{ __('Сайт включён (открыт для покупателей)') }}</label>

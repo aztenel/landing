@@ -31,3 +31,12 @@ Schedule::command('prime:orders-tick')->everyFiveMinutes()->withoutOverlapping()
 
 // Storefront: nightly full check of the public cards against the warehouse (TZ 05 §8.6)
 Schedule::command('prime:site-reconcile')->dailyAt('03:40')->timezone('Asia/Almaty')->withoutOverlapping();
+
+// Parallel run with sfon: nightly comparison of stock and prices (TZ 07 §1.9); idle without SFON_API_KEY or after Ш11
+Schedule::command('prime:sfon-reconcile')->dailyAt('03:00')->timezone('Asia/Almaty')->withoutOverlapping();
+
+// Owner summaries (TZ 06 §4.1): morning «Итог вчера» (+ week on Monday, month on the 1st) and «Итог дня» at 22:30
+Schedule::command('prime:summaries')->everyMinute()->withoutOverlapping();
+
+// Site promotions: start and finish by the clock (TZ 05 §6.3)
+Schedule::command('prime:promotions-tick')->everyMinute()->withoutOverlapping();
