@@ -27,12 +27,16 @@ class AccessChecker
             return AccessDecision::denied($permission, 'Нет доступа к этому магазину');
         }
 
+        if (! PermissionCatalog::exists($permission)) {
+            return AccessDecision::denied($permission, 'Нет права: '.$permission);
+        }
         $role = $this->role($user);
+        // The owner has every right of the catalog, including rights added later by new modules (audit №23).
+        if ($role?->is_owner) {
+            return AccessDecision::allowed($permission);
+        }
         if (! $role || ! $role->hasPermissionTo($permission)) {
             return AccessDecision::denied($permission, 'Нет права: '.PermissionCatalog::title($permission));
-        }
-        if ($role->is_owner) {
-            return AccessDecision::allowed($permission);
         }
 
         // «З» — the role may do it only with an approval, every time.

@@ -52,7 +52,8 @@ final class PermissionCatalog
         'sale.send' => ['sale', 'Отправить чек и гарантию клиенту', 'Y', 'Y', 'Y', 'Y', '-'],
         'sale.set_seller' => ['sale', 'Выбрать другого продавца в чеке', 'Y', 'Y', 'Y', '-', '-'],
         // 3.2 Клиенты, долги клиентов, бонусы
-        'customer.create' => ['customers', 'Создать клиента, найти по телефону', 'Y', 'Y', 'Y', 'Y', 'V'],
+        'customer.create' => ['customers', 'Создать клиента, найти по телефону', 'Y', 'Y', 'Y', 'Y', '-'],
+        'customer.view' => ['customers', 'Клиенты: смотреть список и карточки', 'Y', 'Y', 'Y', 'Y', 'V'],
         'customer.edit' => ['customers', 'Изменить имя/телефон клиента', 'Y', 'Y', 'Y', 'O', '-'],
         'customer.list' => ['customers', 'Список всех клиентов, поиск по имени', 'Y', 'Y', 'Y', 'Y', 'Y'],
         'customer.export' => ['customers', 'Выгрузка клиентов в Excel', 'Y', 'A', '-', '-', 'Y'],
@@ -115,15 +116,18 @@ final class PermissionCatalog
         'money.collect' => ['money', 'Инкассация', 'Y', 'Y', 'Y', '-', '-'],
         'money.transfer' => ['money', 'Перевод между счетами, обмен валюты', 'Y', 'Y', '-', '-', '-'],
         'rate.set' => ['money', 'Курс доллара', 'Y', 'Y', '-', '-', '-'],
-        'debt.supplier' => ['money', 'Оплата поставщику, долги поставщикам', 'Y', 'Y', '-', '-', 'V'],
+        'debt.supplier' => ['money', 'Оплата поставщику', 'Y', 'Y', '-', '-', '-'],
+        'debt.supplier_view' => ['money', 'Долги поставщикам: смотреть', 'Y', 'Y', '-', '-', 'V'],
         'money.adjust' => ['money', 'Корректировка кассы', 'Y', 'L', '-', '-', '-'],
         'money.accounts' => ['money', 'Счета и комиссии', 'Y', '-', '-', '-', '-'],
-        'payroll.manage' => ['money', 'Начисления продавцам, выплаты', 'Y', '-', '-', '-', 'V'],
+        'payroll.manage' => ['money', 'Начисления продавцам, выплаты', 'Y', '-', '-', '-', '-'],
+        'payroll.view' => ['money', 'Начисления продавцам: смотреть', 'Y', '-', '-', '-', 'V'],
         'payroll.own' => ['money', 'Свой заработок', 'Y', 'Y', 'Y', 'Y', '-'],
         // 3.7 Документы
         'doc.reverse' => ['documents', 'Сторно проведённого документа', 'Y', 'L', 'A', 'A', '-'],
         'doc.backdate' => ['documents', 'Документ задним числом (до 3 дней)', 'Y', 'Y', '-', '-', '-'],
-        'period.close' => ['documents', 'Закрыть период (месяц)', 'Y', '-', '-', '-', 'V'],
+        'period.close' => ['documents', 'Закрыть / открыть период (месяц)', 'Y', '-', '-', '-', '-'],
+        'period.view' => ['documents', 'Закрытые периоды и чек-лист закрытия: смотреть', 'Y', 'Y', '-', '-', 'V'],
         'doc.drafts_any' => ['documents', 'Черновики других сотрудников', 'Y', 'Y', 'S', '-', '-'],
         'doc.opening_balance' => ['documents', 'Входящие остатки (день X)', 'Y', '-', '-', '-', '-'],
         // 3.8 Отчёты
@@ -157,7 +161,7 @@ final class PermissionCatalog
         'money.view_bank_balances' => ['visibility', 'Остатки безналичных счетов', 'Y', 'Y', '-', '-', 'Y'],
     ];
 
-    private const ROLE_COLUMNS = [
+    public const ROLE_COLUMNS = [
         RoleTemplates::OWNER => 2,
         RoleTemplates::ADMIN => 3,
         RoleTemplates::SENIOR_SELLER => 4,
@@ -169,6 +173,11 @@ final class PermissionCatalog
     public static function codes(): array
     {
         return array_keys(self::MATRIX);
+    }
+
+    public static function exists(string $code): bool
+    {
+        return isset(self::MATRIX[$code]);
     }
 
     public static function title(string $code): string
@@ -187,10 +196,28 @@ final class PermissionCatalog
         return self::MATRIX[$code][self::ROLE_COLUMNS[$role]] ?? '-';
     }
 
-    /** @return list<string> permissions granted to a role template */
+    /**
+     * Permissions that only show data. A «V» (👁 view only) cell may appear only on these: a view-only cell must
+     * never grant an action (audit №1 — the accountant could pay suppliers and close months).
+     */
+    public const VIEW_PERMISSIONS = [
+        'customer.view', 'debt.customer_report', 'debt.supplier_view', 'payroll.view', 'period.view',
+        'stock.passport', 'stock.other_stores', 'money.balance', 'audit.view',
+    ];
+
+    public static function isView(string $code): bool
+    {
+        return in_array($code, self::VIEW_PERMISSIONS, true);
+    }
+
+    /** @return list<string> permissions granted to a role template («V» grants only view permissions) */
     public static function grantedTo(string $role): array
     {
-        return array_values(array_filter(self::codes(), fn ($code) => self::mode($code, $role) !== '-'));
+        return array_values(array_filter(self::codes(), function ($code) use ($role) {
+            $mode = self::mode($code, $role);
+
+            return $mode !== '-' && ($mode !== 'V' || self::isView($code));
+        }));
     }
 
     /** @return list<string> permissions that a role template may use only via approval («З») */

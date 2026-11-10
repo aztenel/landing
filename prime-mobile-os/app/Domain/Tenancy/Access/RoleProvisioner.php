@@ -52,6 +52,9 @@ class RoleProvisioner
                 if ($isNew || $resetExisting) {
                     $role->syncPermissions(PermissionCatalog::grantedTo($code));
                     $this->installLimits($role, $code);
+                } elseif ($role->is_owner) {
+                    // rights added by new modules reach the owner of existing firms (audit №23)
+                    $role->givePermissionTo(array_values(array_diff(PermissionCatalog::codes(), $role->permissions->pluck('name')->all())));
                 }
                 $roles[$code] = $role;
             }

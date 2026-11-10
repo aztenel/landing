@@ -75,3 +75,41 @@ it('removes cost and supplier fields from data for a seller (TZ 03 §4.2, §19 p
     expect($forOwner)->toHaveKeys(['cost_kzt', 'supplier_id']);
     expect(StockUnit::hiddenFieldsFor($w->admin))->toBe([]);
 });
+
+it('never turns a view-only cell (👁) into an action: the accountant cannot pay suppliers or close a month (audit №1)', function () {
+    $w = world();
+    $access = app(AccessChecker::class);
+
+    foreach (PermissionCatalog::codes() as $code) {
+        foreach (array_keys(PermissionCatalog::ROLE_COLUMNS) as $role) {
+            if (PermissionCatalog::mode($code, $role) === 'V') {
+                expect(PermissionCatalog::isView($code))->toBeTrue("«V» on the action permission {$code} ({$role})");
+            }
+        }
+    }
+
+    expect($access->can($w->accountant, 'debt.supplier'))->toBeFalse()
+        ->and($access->can($w->accountant, 'debt.supplier_view'))->toBeTrue()
+        ->and($access->can($w->accountant, 'period.close'))->toBeFalse()
+        ->and($access->can($w->accountant, 'period.view'))->toBeTrue()
+        ->and($access->can($w->accountant, 'payroll.manage'))->toBeFalse()
+        ->and($access->can($w->accountant, 'customer.create'))->toBeFalse()
+        ->and($access->can($w->accountant, 'customer.view'))->toBeTrue()
+        ->and($access->can($w->admin, 'period.close'))->toBeFalse()
+        ->and($access->can($w->owner, 'period.close'))->toBeTrue();
+
+    expect(fn () => app(\App\Domain\Ledger\Services\AccountingPeriods::class)->close(now()->subMonthNoOverflow(), $w->accountant))
+        ->toThrow(\App\Domain\Tenancy\Access\Exceptions\AccessDenied::class);
+});
+
+it('gives the owner every right of the catalog, also rights added later (audit №23)', function () {
+    $w = world();
+    $owner = Role::query()->where('organization_id', $w->org->id)->where('name', RoleTemplates::OWNER)->first();
+    $owner->revokePermissionTo('period.view'); // as if the right was added by a module after the firm was created
+
+    expect(app(AccessChecker::class)->can($w->owner, 'period.view'))->toBeTrue()
+        ->and(app(AccessChecker::class)->can($w->owner, 'no.such.right'))->toBeFalse();
+
+    app(\App\Domain\Tenancy\Access\RoleProvisioner::class)->installFor($w->org);
+    expect($owner->fresh()->hasPermissionTo('period.view'))->toBeTrue();
+});
