@@ -44,6 +44,11 @@ class OpeningBalanceHandler extends AbstractDocumentHandler
         private readonly BonusLedger $bonuses,
     ) {}
 
+    public function shiftRequirement(Document $document): \App\Domain\Ledger\Posting\ShiftRequirement
+    {
+        return \App\Domain\Ledger\Posting\ShiftRequirement::Never;
+    }
+
     public function type(): DocumentType
     {
         return DocumentType::OpeningBalance;

@@ -91,6 +91,7 @@ class Poster
             $ctx->locks = $this->locks->acquire($plan, $organization->id, $doc->type->prefix(), $year);
 
             $handler->post($doc, $ctx);
+            $doc->shift_id = ShiftGuard::check($doc, $handler->shiftRequirement($doc), $doc);
 
             $doc->forceFill([
                 'number' => $this->numbers->issue($ctx->locks->counter()),

@@ -158,6 +158,7 @@ class Reverser
             }
 
             $handler->afterReverse($orig, $ctx);
+            $reversal->shift_id = ShiftGuard::check($reversal, $handler->shiftRequirement($orig), $reversal);
 
             $reversal->forceFill([
                 'number' => $this->numbers->issue($ctx->locks->counter()),

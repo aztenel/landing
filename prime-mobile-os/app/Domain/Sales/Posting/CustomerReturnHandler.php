@@ -53,6 +53,11 @@ class CustomerReturnHandler extends AbstractDocumentHandler
         private readonly ReturnCalculator $calculator,
     ) {}
 
+    public function shiftRequirement(Document $document): \App\Domain\Ledger\Posting\ShiftRequirement
+    {
+        return \App\Domain\Ledger\Posting\ShiftRequirement::Always;
+    }
+
     public function type(): DocumentType
     {
         return DocumentType::CustomerReturn;

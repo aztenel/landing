@@ -36,7 +36,7 @@ return new class extends Migration
             ['documents', 'reversal_of_document_id', 'restrict'],
             ['documents', 'reversed_by_document_id', 'restrict'],
             ['stock_units', 'purchase_document_id', 'restrict'],
-            ['shifts', 'discrepancy_document_id', 'restrict'],
+            ['shift_counts', 'document_id', 'restrict'],
             ['inventory_movements', 'document_id', 'restrict'],
             ['money_entries', 'document_id', 'restrict'],
             ['debt_entries', 'document_id', 'restrict'],
@@ -59,7 +59,7 @@ return new class extends Migration
             ['account_balances', 'account_id', 'restrict'],
             ['money_entries', 'account_id', 'restrict'],
             ['payment_methods', 'account_id', 'restrict'],
-            ['shifts', 'account_id', 'restrict'],
+            ['shift_counts', 'account_id', 'restrict'],
         ],
         'money_articles' => [
             ['money_entries', 'article_id', 'restrict'],

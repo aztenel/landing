@@ -23,7 +23,7 @@ class OutboxDispatcher
         for ($i = 0; $i < $limit; $i++) {
             $result = DB::transaction(function () {
                 $row = DB::table('outbox_events')
-                    ->whereNull('processed_at')->where('available_at', '<=', now())
+                    ->whereNull('processed_at')->whereRaw('available_at <= clock_timestamp()') // DB clock: PHP «now» is cut to whole seconds
                     ->orderBy('id')->lock('for update skip locked')->first();
                 if (! $row) {
                     return null;

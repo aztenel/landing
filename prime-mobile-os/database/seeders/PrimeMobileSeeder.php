@@ -218,6 +218,9 @@ class PrimeMobileSeeder extends Seeder
         $aigerim = $this->users['aigerim'];
         $daniyar = $this->users['daniyar'];
 
+        // the shop's shift is open for the whole demo history (sales and cash documents need it, audit №18)
+        $this->at($this->day(45, 9, 0), fn () => app(\App\Domain\Ledger\Services\Shifts::class)->open($this->store, $owner));
+
         // Day X: opening balance (phones 1–14, accessories, money, debts, bonuses)
         $this->at($this->day(45, 10, 0), function () use ($owner) {
             $draft = OpeningBalanceDraft::make($this->store)->comment('Входящие остатки из sfon');

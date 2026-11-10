@@ -20,4 +20,9 @@ abstract class AbstractDocumentHandler implements DocumentHandler
     }
 
     public function afterReverse(Document $original, PostingContext $ctx): void {}
+
+    public function shiftRequirement(Document $document): ShiftRequirement
+    {
+        return ShiftRequirement::IfStoreCash;
+    }
 }

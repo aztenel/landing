@@ -179,30 +179,45 @@ return new class extends Migration
         });
         DB::statement('ALTER TABLE customer_bonus_balances ADD CONSTRAINT customer_bonus_balances_check CHECK (available >= 0 AND pending >= 0)');
 
+        // One shift per STORE covering all its cash registers (₸ and $); not an accounting document (audit №57)
         Schema::create('shifts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('organization_id')->constrained()->restrictOnDelete();
             $table->foreignId('store_id')->constrained()->restrictOnDelete();
-            $table->unsignedBigInteger('account_id');                // cash account of the register
-            $table->foreign('account_id')->references('id')->on('money_accounts')->restrictOnDelete();
+            $table->string('number', 32);                            // СМН-2026-000012
+            $table->unsignedSmallInteger('number_year');
+            $table->string('status', 16)->default('open');           // open | closed | auto_closed
             $table->foreignId('opened_by')->constrained('users')->restrictOnDelete();
             $table->timestampTz('opened_at');
-            $table->bigInteger('opening_expected')->default(0);
-            $table->bigInteger('opening_counted')->default(0);
             $table->foreignId('closed_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->timestampTz('closed_at')->nullable();
-            $table->bigInteger('closing_expected')->nullable();
-            $table->bigInteger('closing_counted')->nullable();
-            $table->jsonb('closing_denominations')->nullable();
-            $table->foreignId('discrepancy_document_id')->nullable()->constrained('documents')->restrictOnDelete();
+            $table->text('note')->nullable();
             $table->timestampsTz();
+            $table->unique(['organization_id', 'number']);
         });
-        DB::statement('CREATE UNIQUE INDEX shifts_one_open_per_account ON shifts (account_id) WHERE closed_at IS NULL');
+        DB::statement("ALTER TABLE shifts ADD CONSTRAINT shifts_status_check CHECK (status IN ('open','closed','auto_closed') AND ((status = 'open') = (closed_at IS NULL)))");
+        DB::statement("CREATE UNIQUE INDEX shifts_one_open_per_store ON shifts (store_id) WHERE status = 'open'");
+
+        // counted cash per register at opening and closing; a difference is a document РКС (audit №57)
+        Schema::create('shift_counts', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
+            $table->foreignId('shift_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('account_id')->constrained('money_accounts')->restrictOnDelete();
+            $table->string('phase', 8);                              // open | close
+            $table->bigInteger('expected');
+            $table->bigInteger('counted');
+            $table->bigInteger('diff');
+            $table->jsonb('denominations')->nullable();
+            $table->foreignId('document_id')->nullable()->constrained('documents')->restrictOnDelete();
+            $table->timestampsTz();
+            $table->unique(['shift_id', 'account_id', 'phase']);
+        });
     }
 
     public function down(): void
     {
-        foreach (['shifts', 'customer_bonus_balances', 'counterparty_balances', 'account_balances', 'bonus_allocations', 'bonus_entries', 'debt_entries', 'money_entries', 'inventory_movements'] as $t) {
+        foreach (['shift_counts', 'shifts', 'customer_bonus_balances', 'counterparty_balances', 'account_balances', 'bonus_allocations', 'bonus_entries', 'debt_entries', 'money_entries', 'inventory_movements'] as $t) {
             Schema::dropIfExists($t);
         }
     }

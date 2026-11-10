@@ -38,4 +38,7 @@ interface DocumentHandler
 
     /** Detail-table side effects after the inverse entries were written (e.g. sale_lines.is_active = false). */
     public function afterReverse(Document $original, PostingContext $ctx): void;
+
+    /** Does posting / reversing this document need an open shift of its store (audit №18)? */
+    public function shiftRequirement(Document $document): ShiftRequirement;
 }
