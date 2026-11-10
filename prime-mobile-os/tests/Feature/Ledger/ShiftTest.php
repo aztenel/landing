@@ -57,3 +57,12 @@ it('posts and reverses several documents as one operation: all or nothing (audit
     expect($pa->refresh()->status->value)->toBe('reversed')->and($pb->refresh()->status->value)->toBe('reversed')
         ->and(Reconciliation::problems())->toBe([]);
 });
+
+it('edits the lines of a draft only under the posting lock and never after posting (audit №45)', function () {
+    $w = world();
+    $draft = SaleDraft::make($w->store, $w->seller)->unit($w->phone(), Money::kzt(900000))->cash(Money::kzt(900000))->save();
+    $draft->editDraft(fn ($d) => \App\Domain\Sales\Models\SalePayment::query()->where('document_id', $d->id)->update(['tendered' => Money::kzt(1000000)->amount]));
+
+    app(\App\Domain\Ledger\Posting\Poster::class)->post($draft, $w->owner);
+    expect(fn () => $draft->editDraft(fn () => null))->toThrow(\App\Domain\Ledger\Exceptions\DocumentNotDraft::class);
+});

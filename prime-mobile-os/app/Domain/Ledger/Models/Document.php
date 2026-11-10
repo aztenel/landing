@@ -51,6 +51,24 @@ class Document extends Model
         ];
     }
 
+    /**
+     * Change the detail rows of a DRAFT safely (audit №45): takes the same row lock as Poster::post(), so lines cannot
+     * change while the document is being posted, and refuses a document that is no longer a draft.
+     *
+     *   $document->editDraft(fn (Document $d) => SaleLine::query()->where('document_id', $d->id)->...);
+     */
+    public function editDraft(callable $change): mixed
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($change) {
+            $locked = static::query()->whereKey($this->id)->lockForUpdate()->firstOrFail();
+            if (! $locked->isDraft()) {
+                throw \App\Domain\Ledger\Exceptions\DocumentNotDraft::because('not_draft', 'Документ уже проведён — его нельзя менять');
+            }
+
+            return $change($locked);
+        });
+    }
+
     public function isDraft(): bool
     {
         return $this->status === DocumentStatus::Draft;
