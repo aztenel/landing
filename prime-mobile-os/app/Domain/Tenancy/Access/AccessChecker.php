@@ -47,7 +47,8 @@ class AccessChecker
 
         if ($limit !== null && $value !== null) {
             $limitValue = $this->limitValue($membership, $role, $limit);
-            if ($limitValue !== null && $value > $limitValue) {
+            // a limit of 0 means «always an approval» (audit №48)
+            if ($limitValue !== null && ($value > $limitValue || $limitValue === 0)) {
                 return AccessDecision::approval($permission, $limit, $limitValue, $value, $this->limitMessage($limit, $limitValue, $value));
             }
         }

@@ -172,7 +172,9 @@ class CustomerReturnHandler extends AbstractDocumentHandler
             $prepared[] = [$line, $saleLine, $amount];
             $saleLine->stock_unit_id ? $phones += $amount : $accessories += $amount;
         }
-        $days = (int) abs(CarbonImmutable::parse($saleDoc->occurred_at)->startOfDay()->diffInDays($ctx->occurredAt()->startOfDay()));
+        // calendar days in the firm time zone (audit №49), not in UTC
+        $tz = $ctx->organization->timezone;
+        $days = (int) abs(CarbonImmutable::parse($saleDoc->occurred_at)->setTimezone($tz)->startOfDay()->diffInDays($ctx->occurredAt()->setTimezone($tz)->startOfDay()));
         if ($phones > 0) {
             $ctx->authorize('return.phone', Limit::ReturnPhone, $phones, 'return');
             $ctx->authorize('return.phone', Limit::ReturnDays, $days, 'return');

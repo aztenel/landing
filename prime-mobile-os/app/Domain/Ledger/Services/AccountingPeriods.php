@@ -74,6 +74,13 @@ class AccountingPeriods
             if ($org->closed_until && $start->lessThanOrEqualTo(CarbonImmutable::parse($org->closed_until->format('Y-m-d'), $tz))) {
                 throw PostingException::because('period_already_closed', 'Этот месяц уже закрыт');
             }
+            // months are closed only in order (audit №46): the next one after the last closed month
+            if ($org->closed_until) {
+                $next = CarbonImmutable::parse($org->closed_until->format('Y-m-d'), $tz)->addDay()->startOfMonth();
+                if (! $start->equalTo($next)) {
+                    throw PostingException::because('period_order', 'Месяцы закрываются по порядку: сначала закройте '.$next->locale('ru')->translatedFormat('F Y'));
+                }
+            }
             $drafts = Document::query()->where('status', DocumentStatus::Draft->value)
                 ->whereBetween('occurred_at', [$start->utc(), $end->utc()])->count();
             if ($drafts > 0) {
