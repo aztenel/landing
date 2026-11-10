@@ -201,6 +201,9 @@ class CustomerReturnHandler extends AbstractDocumentHandler
             $creditPart += $this->calculator->creditPart($saleLine, $qty);
             if ($saleLine->stock_unit_id) {
                 $unit = $ctx->locks->unit((int) $saleLine->stock_unit_id);
+                if ($saleLine->closed_reason === 'bought_back') {
+                    throw PostingException::because('line_bought_back', 'Телефон выкуплен обратно по акту trade-in — возврат по этой продаже невозможен');
+                }
                 if (! $saleLine->is_active) {
                     throw PostingException::because('line_inactive', 'Эта продажа телефона уже возвращена или сторнирована');
                 }

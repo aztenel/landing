@@ -2,6 +2,7 @@
 
 namespace App\Domain\Ledger\Posting\Ledgers;
 
+use App\Domain\Sales\Models\SaleLine;
 use App\Domain\Catalog\Models\Accessory;
 use App\Domain\Inventory\Enums\UnitAction;
 use App\Domain\Inventory\Enums\UnitStatus;
@@ -86,6 +87,13 @@ class InventoryLedger
             ];
         }
         $unit->forceFill($changes)->save();
+
+        // a phone we sold comes back by trade-in (sold → preparing): its sale line is closed here, so no module can
+        // forget it and the phone can be sold again (audit №39); the reversal of this movement reopens the line
+        if ($action === UnitAction::TradeInKnown) {
+            SaleLine::query()->where('stock_unit_id', $unit->id)->where('is_active', true)
+                ->update(['is_active' => false, 'closed_reason' => 'bought_back', 'closed_by_document_id' => $ctx->document->id]);
+        }
 
         return $movement;
     }
@@ -296,6 +304,12 @@ class InventoryLedger
         if ($qty !== 0 && $restoreStatus === null) {
             // creation reversed: the phone is not in stock any more, its IMEIs may be entered again correctly
             UnitIdentifier::query()->where('stock_unit_id', $unit->id)->delete();
+        }
+        if ($qty > 0 && $restoreStatus === UnitStatus::Sold) {
+            // reversal of a trade-in of our own phone: its sale line becomes active again (audit №39)
+            SaleLine::query()->where('stock_unit_id', $unit->id)->where('closed_reason', 'bought_back')
+                ->where('closed_by_document_id', $original->document_id)
+                ->update(['is_active' => true, 'closed_reason' => null, 'closed_by_document_id' => null]);
         }
 
         return $movement;

@@ -386,3 +386,60 @@ it('changes a unit status without a document only for the journal-free transitio
     expect($unit->refresh()->status)->toBe(UnitStatus::InStock)
         ->and(Reconciliation::problems())->toBe([]);
 });
+
+it('sells our own phone again after taking it back by trade-in; reversals in reverse order reconcile (audit №39)', function () {
+    $w = world();
+    app(HandlerRegistry::class)->register(DocumentType::TradeIn, new class(app(InventoryLedger::class)) extends AbstractDocumentHandler
+    {
+        public function __construct(private readonly InventoryLedger $inventory) {}
+
+        public function type(): DocumentType
+        {
+            return DocumentType::TradeIn;
+        }
+
+        public function validate(Document $document, PostingContext $ctx): void {}
+
+        public function lockPlan(Document $document, PostingContext $ctx): LockPlan
+        {
+            return (new LockPlan)->unit((int) $document->meta['unit_id']);
+        }
+
+        public function post(Document $document, PostingContext $ctx): void
+        {
+            $unit = $ctx->locks->unit((int) $document->meta['unit_id']);
+            $this->inventory->unitIn($ctx, $unit, Location::store($ctx->requireStoreId()), MovementKind::TradeInIn,
+                UnitAction::TradeInKnown, UnitStatus::Preparing, (int) $document->meta['cost']);
+        }
+    });
+
+    $phone = $w->phone(cost: Money::kzt(489250));
+    $first = SaleDraft::make($w->store, $w->owner)->unit($phone, Money::kzt(549000))->cash(Money::kzt(549000))->post($w->owner);
+    $act = new Document;
+    $act->forceFill([
+        'type' => DocumentType::TradeIn->value, 'status' => 'draft', 'store_id' => $w->store->id, 'occurred_at' => now(),
+        'idempotency_key' => Idempotency::newKey(), 'meta' => ['unit_id' => $phone->id, 'cost' => Money::kzt(300000)->amount],
+    ])->save();
+    app(Poster::class)->post($act, $w->owner);
+
+    $firstLine = SaleLine::query()->where('document_id', $first->id)->firstOrFail();
+    expect($firstLine->is_active)->toBeFalse()->and($firstLine->closed_reason)->toBe('bought_back')
+        ->and(Reconciliation::problems())->toBe([]);
+
+    // a return by that old sale is refused
+    expect(fn () => CustomerReturnDraft::make($first)->line($firstLine, 1)->refund('cash', Money::kzt(549000))->post($w->owner))
+        ->toThrow(PostingException::class, 'выкуплен обратно');
+
+    // ready for sale, sold again
+    app(\App\Domain\Inventory\Services\UnitStatusService::class)->markReady($phone->refresh(), $w->owner);
+    $second = SaleDraft::make($w->store, $w->owner)->unit($phone->refresh(), Money::kzt(420000))->cash(Money::kzt(420000))->post($w->owner);
+    expect($phone->refresh()->status)->toBe(UnitStatus::Sold)->and(Reconciliation::problems())->toBe([]);
+
+    // reverse in the reverse order
+    rev($second, $w);
+    app(\App\Domain\Inventory\Services\UnitStatusService::class)->change($phone->refresh(), UnitStatus::Preparing, UnitAction::SendToPreparation, $w->owner, 'stock.prepare_cost');
+    rev($act, $w);
+    expect($firstLine->refresh()->is_active)->toBeTrue()->and($firstLine->closed_reason)->toBeNull()
+        ->and($phone->refresh()->status)->toBe(UnitStatus::Sold)
+        ->and(Reconciliation::problems())->toBe([]);
+});
