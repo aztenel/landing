@@ -21,6 +21,8 @@ class MoneyAccount extends Model
     /** Technical account through which trade-in offsets pass (TZ 02 §6.1). */
     public const CODE_TRADEIN_OFFSET = 'tradein_offset';
 
+    public const CODE_EXCHANGE_OFFSET = 'exchange_offset';
+
     protected $fillable = ['organization_id', 'store_id', 'code', 'name', 'type', 'currency', 'default_commission_percent', 'allow_negative', 'is_hidden', 'is_active', 'sort', 'created_by'];
 
     protected function casts(): array

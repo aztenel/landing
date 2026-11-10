@@ -144,6 +144,13 @@ class SaleHandler extends AbstractDocumentHandler
             if ($method === PaymentMethodCode::TradeIn) {
                 throw PostingException::because('tradein_without_act', 'Зачёт trade-in принимается только вместе с актом trade-in');
             }
+            if ($method === PaymentMethodCode::ExchangeOffset) {
+                // only in the pair «return + new sale» posted as one operation (audit №34); the exchange screen plugs it in
+                throw PostingException::because('exchange_without_return', 'Зачёт возврата принимается только при обмене вместе с возвратом');
+            }
+            if ($method === PaymentMethodCode::KaspiShop && $payments->count() !== 1) {
+                throw PostingException::because('kaspi_shop_single', 'Заказ Kaspi Магазина оплачивается только способом «Kaspi Магазин» целиком');
+            }
             if ($method->isMoney()) {
                 // account and bank commission come from the firm settings of the payment method, never from the request
                 $setup = PaymentMethod::resolve($method, $ctx->requireStoreId());

@@ -107,16 +107,23 @@ class OrganizationProvisioner
      */
     public function installStarterAccounts(Store $store, array $commissions = []): array
     {
+        // the cash registers belong to the store (audit №52): the first store keeps the short codes, others get a suffix
+        $suffix = MoneyAccount::query()->where('code', 'cash_kzt')->where('store_id', '<>', $store->id)->exists() ? '_s'.$store->id : '';
         $defs = [
-            'cash_kzt' => ["Касса ₸ — {$store->name}", AccountType::Cash, Currency::KZT, $store->id, false, false],
-            'cash_usd' => ["Касса $ — {$store->name}", AccountType::Cash, Currency::USD, $store->id, false, false],
+            'cash_kzt'.$suffix => ["Касса ₸ — {$store->name}", AccountType::Cash, Currency::KZT, $store->id, false, false],
+            'cash_usd'.$suffix => ["Касса $ — {$store->name}", AccountType::Cash, Currency::USD, $store->id, false, false],
             'safe_kzt' => ['Сейф ₸', AccountType::Safe, Currency::KZT, null, false, false],
             'safe_usd' => ['Сейф $', AccountType::Safe, Currency::USD, null, false, false],
             'kaspi_gold' => ['Kaspi Gold', AccountType::Bank, Currency::KZT, null, false, false],
             'kaspi_qr' => ['Kaspi QR', AccountType::Bank, Currency::KZT, null, false, false],
             'kaspi_pay' => ['Kaspi Pay (рассрочки)', AccountType::InstallmentBank, Currency::KZT, null, false, false],
-            'halyk_terminal' => ['Терминал Halyk', AccountType::Bank, Currency::KZT, $store->id, false, false],
+            'kaspi_shop' => ['Kaspi Магазин', AccountType::Bank, Currency::KZT, null, false, false],
+            'halyk_terminal'.$suffix => ['Терминал Halyk — '.$store->name, AccountType::Bank, Currency::KZT, $store->id, false, false],
+            // technical accounts (audit №28, №34, №40): the two offsets may go below zero inside a pair of documents
             MoneyAccount::CODE_TRADEIN_OFFSET => ['Зачёт trade-in', AccountType::Technical, Currency::KZT, null, true, true],
+            MoneyAccount::CODE_EXCHANGE_OFFSET => ['Зачёт обмена', AccountType::Technical, Currency::KZT, null, true, true],
+            'collection_transit_kzt' => ['Инкассация в пути ₸', AccountType::Technical, Currency::KZT, null, false, true],
+            'collection_transit_usd' => ['Инкассация в пути $', AccountType::Technical, Currency::USD, null, false, true],
         ];
         $accounts = [];
         $sort = 0;
@@ -128,8 +135,7 @@ class OrganizationProvisioner
         }
 
         $methods = [
-            PaymentMethodCode::Cash->value => 'cash_kzt',
-            PaymentMethodCode::Card->value => 'halyk_terminal',
+            PaymentMethodCode::Card->value => 'halyk_terminal'.$suffix,
             PaymentMethodCode::KaspiQr->value => 'kaspi_qr',
             PaymentMethodCode::KaspiTransfer->value => 'kaspi_gold',
             PaymentMethodCode::KaspiRed->value => 'kaspi_pay',
@@ -139,14 +145,28 @@ class OrganizationProvisioner
             PaymentMethodCode::Bonus->value => null,
             PaymentMethodCode::TradeIn->value => MoneyAccount::CODE_TRADEIN_OFFSET,
             PaymentMethodCode::Prepayment->value => null,
+            PaymentMethodCode::KaspiShop->value => 'kaspi_shop',
+            PaymentMethodCode::ExchangeOffset->value => MoneyAccount::CODE_EXCHANGE_OFFSET,
         ];
+        // cash of THIS store (audit №52)
+        PaymentMethod::query()->updateOrCreate(['code' => PaymentMethodCode::Cash->value, 'store_id' => $store->id], [
+            'name_ru' => PaymentMethodCode::Cash->label(), 'account_id' => $accounts['cash_kzt'.$suffix]->id,
+            'commission_percent' => '0.00', 'is_refundable' => true, 'sort' => 0,
+        ]);
         $sort = 0;
         foreach ($methods as $code => $accountCode) {
+            $method = PaymentMethodCode::from($code);
+            $exists = PaymentMethod::query()->where('code', $code)->whereNull('store_id')->exists();
+            if ($exists) {
+                continue; // a firm-wide method is created once; a second store must not reset what the owner set
+            }
             PaymentMethod::query()->updateOrCreate(['code' => $code, 'store_id' => null], [
-                'name_ru' => PaymentMethodCode::from($code)->label(),
+                'name_ru' => $method->label(),
+                // a bank method is on only once its commission is entered (audit №52)
+                'is_enabled' => ! $method->hasBankCommission() || array_key_exists($code, $commissions),
                 'account_id' => $accountCode ? $accounts[$accountCode]->id : null,
                 'commission_percent' => $commissions[$code] ?? '0.00',
-                'is_refundable' => ! in_array($code, ['debt', 'bonus', 'tradein', 'prepayment'], true),
+                'is_refundable' => ! in_array($code, ['debt', 'bonus', 'tradein', 'prepayment', 'exchange_offset'], true),
                 'sort' => $sort += 10,
             ]);
         }

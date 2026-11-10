@@ -20,6 +20,8 @@ enum PaymentMethodCode: string
     case Bonus = 'bonus';
     case TradeIn = 'tradein';
     case Prepayment = 'prepayment';
+    case KaspiShop = 'kaspi_shop';            // Kaspi Магазин: the whole order with this one method (audit №34)
+    case ExchangeOffset = 'exchange_offset';  // Зачёт возврата при обмене: only with the return in one operation (audit №34)
 
     public function label(): string
     {
@@ -37,13 +39,22 @@ enum PaymentMethodCode: string
             self::Bonus => 'Бонусы',
             self::TradeIn => 'Зачёт trade-in',
             self::Prepayment => 'Из предоплаты',
+            self::KaspiShop => 'Kaspi Магазин',
+            self::ExchangeOffset => 'Зачёт возврата (обмен)',
         };
     }
 
     /** Writes a money entry to a real account (with optional bank commission). */
     public function isMoney(): bool
     {
-        return ! in_array($this, [self::Debt, self::Bonus, self::TradeIn, self::Prepayment], true);
+        return ! in_array($this, [self::Debt, self::Bonus, self::TradeIn, self::Prepayment, self::ExchangeOffset], true);
+    }
+
+    /** Bank methods: switched on only after the owner entered the commission percent (audit №52). */
+    public function hasBankCommission(): bool
+    {
+        return in_array($this, [self::Card, self::KaspiQr, self::KaspiRed, self::KaspiInstallment, self::HalykInstallment,
+            self::HomeCreditInstallment, self::FreedomInstallment, self::KaspiShop], true);
     }
 
     public function isCash(): bool

@@ -166,7 +166,7 @@ class PrimeMobileSeeder extends Seeder
     {
         // Demo commissions (не проверено — the owner sets real ones, TZ 02 §15 q.2)
         foreach (['card' => '1.00', 'kaspi_qr' => '0.95', 'kaspi_installment' => '12.00', 'kaspi_red' => '8.00', 'halyk_installment' => '10.00'] as $code => $pct) {
-            PaymentMethod::query()->where('code', $code)->update(['commission_percent' => $pct]);
+            PaymentMethod::query()->where('code', $code)->update(['commission_percent' => $pct, 'is_enabled' => true]);
         }
     }
 

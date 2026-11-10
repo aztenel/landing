@@ -100,6 +100,9 @@ final class World
         $w->case = Accessory::query()->firstOrCreate(['sku' => 'CASE-15P'], ['name_ru' => 'Чехол iPhone 15 Pro', 'category_id' => $cat->id, 'barcode' => '4600000000011']);
         $w->glass = Accessory::query()->firstOrCreate(['sku' => 'GLASS-15P'], ['name_ru' => 'Стекло iPhone 15 Pro', 'category_id' => $cat->id, 'barcode' => '4600000000028']);
 
+        // bank methods are off until a commission is entered (audit №52); tests use them with 0 % unless they set one
+        \App\Domain\Money\Models\PaymentMethod::query()->update(['is_enabled' => true]);
+
         // sales and cash documents need an open shift of the store (audit №18)
         app(\App\Domain\Ledger\Services\Shifts::class)->open($w->store, $w->owner);
 

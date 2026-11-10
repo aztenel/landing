@@ -123,3 +123,24 @@ it('numbers public codes per firm with the firm prefix (audit №43)', function 
         ->and($other->refresh()->public_code)->toBe('XX-10001')
         ->and($b->phone()->refresh()->public_code)->toBe('XX-10002');
 });
+
+it('gives a second store its own cash, keeps bank methods off until a commission is set (audit №28, №34, №52)', function () {
+    $w = world();
+    $mega = \App\Domain\Tenancy\Models\Store::query()->create(['name' => 'ТРЦ «Мега»']);
+    \App\Domain\Money\Models\PaymentMethod::query()->where('code', 'kaspi_qr')->update(['commission_percent' => '0.95']);
+    $accounts = app(\App\Domain\Tenancy\Services\OrganizationProvisioner::class)->installStarterAccounts($mega);
+
+    $megaCash = \App\Domain\Money\Models\PaymentMethod::resolve('cash', $mega->id);
+    expect((int) $megaCash->account->store_id)->toBe($mega->id)
+        ->and((int) \App\Domain\Money\Models\PaymentMethod::resolve('cash', $w->store->id)->account->store_id)->toBe($w->store->id)
+        ->and(\App\Domain\Money\Models\PaymentMethod::query()->where('code', 'kaspi_qr')->value('commission_percent'))->toBe('0.95')
+        ->and($accounts)->toHaveKeys(['collection_transit_kzt', 'collection_transit_usd', 'exchange_offset', 'kaspi_shop']);
+
+    // a new firm: bank methods are off until the owner enters the commission
+    world(name: 'Новая фирма');
+    expect(\App\Domain\Money\Models\PaymentMethod::query()->where('code', 'kaspi_shop')->value('is_enabled'))->toBeTrue(); // world() switches them on
+    $fresh = app(\App\Domain\Tenancy\Services\OrganizationProvisioner::class)->create('Третья', 'Магазин', \App\Models\User::factory()->create());
+    \App\Support\Tenancy\CurrentOrganization::instance()->set($fresh);
+    expect(\App\Domain\Money\Models\PaymentMethod::query()->where('code', 'kaspi_qr')->value('is_enabled'))->toBeFalse()
+        ->and(\App\Domain\Money\Models\PaymentMethod::query()->where('code', 'cash')->value('is_enabled'))->toBeTrue();
+});
