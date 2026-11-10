@@ -47,6 +47,12 @@ if [ "$(swapon --show | wc -l)" = 0 ] && [ "$MEM_MB" -lt 7000 ] && [ ! -f /swapf
         && echo '/swapfile none swap sw 0 0' >> /etc/fstab; } 2>/dev/null || { rm -f /swapfile; warn "swap не создан — не страшно"; }
 fi
 svc postgresql; svc redis-server
+if ! redis-cli ping 2>/dev/null | grep -q PONG && [ ! -d /run/systemd/system ]; then
+    redis-server /etc/redis/redis.conf --daemonize yes >/dev/null 2>&1 || true    # containers without systemd
+fi
+for i in $(seq 1 15); do pg_isready -q -h 127.0.0.1 && redis-cli ping 2>/dev/null | grep -q PONG && break; sleep 1; done
+pg_isready -q -h 127.0.0.1 || die "PostgreSQL не запустился: systemctl status postgresql"
+redis-cli ping 2>/dev/null | grep -q PONG || die "Redis не запустился: systemctl status redis-server"
 
 # ---------------------------------------------------------------- 2. addresses
 say "2/9 Адреса"
