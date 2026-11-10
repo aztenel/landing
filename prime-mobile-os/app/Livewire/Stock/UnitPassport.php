@@ -16,17 +16,28 @@ use App\Domain\Inventory\Services\PriceService;
 use App\Domain\Inventory\Services\UnitStatusService;
 use App\Domain\Ledger\Models\Document;
 use App\Domain\Ledger\Models\InventoryMovement;
-use App\Domain\Sales\Models\Sale;
 use App\Domain\Sales\Models\SaleLine;
+use App\Domain\Storefront\Models\Listing;
+use App\Domain\Storefront\Models\SitePhoto;
+use App\Domain\Storefront\Services\ListingBuilder;
+use App\Domain\Storefront\Services\Photos;
+use App\Domain\Storefront\Services\SiteSettings;
+use App\Domain\Storefront\Services\Visibility;
+use App\Domain\Storefront\Support\SiteChange;
 use App\Domain\Tenancy\Models\Store;
+use App\Domain\Warehouse\Drafts\StockOpDraft;
 use App\Filament\Shell\Concerns\HasErpAccess;
 use App\Models\User;
 use App\Support\Exceptions\UserFacingException;
+use App\Support\Imei\Imei;
 use App\Support\Money\Money;
 use App\Support\Tenancy\CurrentOrganization;
 use App\Support\Ui\Access;
+use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 /**
  * Э10 «Паспорт телефона» (/unit/PM-10482, route erp.stock.units.show). Everything about one phone: header, «Можно
@@ -39,6 +50,7 @@ use Illuminate\Support\Collection;
 class UnitPassport extends Page
 {
     use HasErpAccess;
+    use WithFileUploads;
 
     protected static string|array|null $permission = 'stock.passport';
 
@@ -54,6 +66,13 @@ class UnitPassport extends Page
 
     public string $newPrice = '';
 
+    public bool $showOld = false;
+
+    /** @var array<int, TemporaryUploadedFile> photos for the site (TZ 05 §3.2) */
+    public array $uploads = [];
+
+    public array $site = ['description_ru' => '', 'description_kk' => '', 'hit' => false, 'new' => false];
+
     public ?string $error = null;
 
     public ?string $flash = null;
@@ -66,6 +85,10 @@ class UnitPassport extends Page
             : (StockUnit::query()->where('public_code', mb_strtoupper($code))->first() ?? StockUnit::findByIdentifier($code));
         abort_unless($unit, 404, __('Телефон с таким IMEI не найден. Проверьте цифры или оприходуйте его'));
         $this->unitId = $unit->id;
+        $this->tabName = in_array(request()->query('tab'), ['site', 'history', 'imei', 'prices'], true) ? request()->query('tab') : $this->tabName;
+        $badges = (array) $unit->site_badges;
+        $this->site = ['description_ru' => (string) $unit->site_description_ru, 'description_kk' => (string) $unit->site_description_kk,
+            'hit' => in_array('hit', $badges, true), 'new' => in_array('new', $badges, true)];
     }
 
     public function getTitle(): string
@@ -107,7 +130,7 @@ class UnitPassport extends Page
             if ($tenge <= 0) {
                 throw new \InvalidArgumentException(__('Введите новую цену'));
             }
-            app(PriceService::class)->setUnitPrice($this->unit(), Money::kzt($tenge), auth()->user());
+            app(PriceService::class)->setUnitPrice($this->unit(), Money::kzt($tenge), auth()->user(), 'manual', $this->showOld);
         }, __('Цена изменена'));
     }
 
@@ -120,18 +143,120 @@ class UnitPassport extends Page
         $changes = [];
         foreach (['imei1', 'imei2'] as $f) {
             $v = trim((string) $this->edit[$f]);
-            if ($v !== '' && \App\Support\Imei\Imei::normalize($v) !== (string) $unit->{$f}) {
+            if ($v !== '' && Imei::normalize($v) !== (string) $unit->{$f}) {
                 $changes[$f] = $v;
             }
         }
-        $this->act(fn () => \App\Domain\Warehouse\Drafts\StockOpDraft::unitEdit($unit, $changes, (string) $this->edit['reason'])->post(auth()->user()), __('Карточка исправлена'));
+        $this->act(fn () => StockOpDraft::unitEdit($unit, $changes, (string) $this->edit['reason'])->post(auth()->user()), __('Карточка исправлена'));
     }
 
     /** «Корректировать себестоимость» КСБ (owner). */
     public function saveCost(): void
     {
         $tenge = (int) str_replace([' ', "\u{00A0}"], '', (string) $this->edit['delta']);
-        $this->act(fn () => \App\Domain\Warehouse\Drafts\StockOpDraft::costAdjustment($this->unit(), Money::kzt($tenge), (string) $this->edit['reason'])->post(auth()->user()), __('Себестоимость изменена'));
+        $this->act(fn () => StockOpDraft::costAdjustment($this->unit(), Money::kzt($tenge), (string) $this->edit['reason'])->post(auth()->user()), __('Себестоимость изменена'));
+    }
+
+    // ---- tab «Сайт» (TZ 05 §3.2, §4, §5.2) ----
+
+    /** Every chosen photo is uploaded and processed at once; the phone appears on the site by itself (§3.2 п. 6). */
+    public function updatedUploads(): void
+    {
+        $this->error = null;
+        Access::authorize('site.photo');
+        $done = 0;
+        foreach ($this->uploads as $file) {
+            try {
+                app(Photos::class)->upload(['stock_unit_id' => $this->unitId], $file, auth()->user());
+                $done++;
+            } catch (UserFacingException $e) {
+                $this->error = $e->getMessage();
+            }
+        }
+        $this->uploads = [];
+        $this->syncSite();
+        $this->flash = $done ? __('Загружено фото: :n', ['n' => $done]) : null;
+    }
+
+    public function photoMove(int $id, int $dir): void
+    {
+        Access::authorize('site.photo');
+        app(Photos::class)->move($this->photo($id), $dir);
+        $this->syncSite();
+    }
+
+    /** The outbox is the reliable path; rebuilding this one card right away makes «сфотографировал — появился» instant. */
+    private function syncSite(): void
+    {
+        app(ListingBuilder::class)->units([$this->unitId]);
+    }
+
+    public function photoRemove(int $id): void
+    {
+        Access::authorize('site.photo');
+        app(Photos::class)->remove($this->photo($id), auth()->user());
+        $this->syncSite();
+        $this->flash = __('Фото удалено');
+    }
+
+    private function photo(int $id): SitePhoto
+    {
+        return SitePhoto::query()->where('stock_unit_id', $this->unitId)->whereNull('deleted_at')->findOrFail($id);
+    }
+
+    public function siteToggle(): void
+    {
+        Access::authorize('site.visibility');
+        $unit = $this->unit();
+        $show = ! $unit->show_on_site;
+        $unit->forceFill(['show_on_site' => $show, 'site_hidden_by' => $show ? null : auth()->id(), 'site_hidden_at' => $show ? null : now()])->save();
+        activity('site')->causedBy(auth()->user())->performedOn($unit)->withProperties(['show' => $show])->log('unit.visibility');
+        SiteChange::units([$unit->id], 'visibility');
+        $this->syncSite();
+        $this->flash = $show ? __('Показывается на сайте') : __('Скрыт с сайта');
+    }
+
+    public function saveSite(): void
+    {
+        Access::authorize('site.description');
+        $unit = $this->unit();
+        $badges = array_values(array_filter(array_diff((array) $unit->site_badges, ['hit', 'new'])));
+        if (Access::allows('site.order')) {
+            $badges = array_merge($badges, $this->site['hit'] ? ['hit'] : [], $this->site['new'] ? ['new'] : []);
+        } else {
+            $badges = array_merge($badges, array_values(array_intersect((array) $unit->site_badges, ['hit', 'new'])));
+        }
+        $unit->forceFill(['site_description_ru' => mb_substr(trim($this->site['description_ru']), 0, 500) ?: null,
+            'site_description_kk' => mb_substr(trim($this->site['description_kk']), 0, 500) ?: null, 'site_badges' => $badges ?: null])->save();
+        activity('site')->causedBy(auth()->user())->performedOn($unit)->log('unit.site_saved');
+        SiteChange::units([$unit->id], 'description');
+        $this->syncSite();
+        $this->flash = __('Сохранено');
+    }
+
+    /** «Поднять наверх» = pin with the last number in its category (max 12, §5.2); «Обычный порядок» = unpin. */
+    public function pin(bool $on): void
+    {
+        Access::authorize('site.order');
+        $unit = $this->unit();
+        $this->error = null;
+        if ($on) {
+            $family = $unit->variant?->productModel?->family;
+            $sameType = StockUnit::query()->whereNotNull('site_pinned_rank')->where('id', '!=', $unit->id)
+                ->whereHas('variant.productModel.family', fn ($q) => $q->where('product_type_id', $family?->product_type_id));
+            if ($sameType->count() >= 12) {
+                $this->error = __('Уже закреплено 12. Открепите один');
+
+                return;
+            }
+            $unit->forceFill(['site_pinned_rank' => (int) $sameType->max('site_pinned_rank') + 1])->save();
+        } else {
+            $unit->forceFill(['site_pinned_rank' => null, 'site_pinned_until' => null])->save();
+        }
+        activity('site')->causedBy(auth()->user())->performedOn($unit)->withProperties(['pinned' => $on])->log('unit.pin');
+        SiteChange::units([$unit->id], 'order');
+        $this->syncSite();
+        $this->flash = $on ? __('Закреплён наверху') : __('Обычный порядок');
     }
 
     public function ready(): void
@@ -180,6 +305,11 @@ class UnitPassport extends Page
                 'prepare' => Access::allows('stock.prepare'), 'prepare_cost' => Access::allows('stock.prepare_cost'),
                 'sell' => Access::allows('sale.create'),
             ],
+            'sitePhotos' => SitePhoto::query()->where('stock_unit_id', $unit->id)->whereNull('deleted_at')->orderBy('sort')->orderBy('id')->get(),
+            'siteReasons' => Visibility::reasons($unit),
+            'listing' => Listing::query()->where('unit_ref', $unit->id)->first(),
+            'siteOn' => SiteSettings::current()->enabled(),
+            'siteCan' => ['photo' => Access::allows('site.photo'), 'visibility' => Access::allows('site.visibility'), 'description' => Access::allows('site.description'), 'order' => Access::allows('site.order')],
             'users' => User::query()->whereIn('id', ImeiCheck::query()->where('stock_unit_id', $unit->id)->select('checked_by'))->pluck('name', 'id'),
         ];
     }
@@ -200,7 +330,7 @@ class UnitPassport extends Page
             ];
         });
         $prices = PriceChange::query()->where('subject_type', 'stock_unit')->where('subject_id', $unit->id)->get()->map(fn ($p) => [
-            'at' => $p->created_at ? \Carbon\CarbonImmutable::parse($p->created_at) : null, 'kind' => 'price', 'title' => __('Смена цены'),
+            'at' => $p->created_at ? CarbonImmutable::parse($p->created_at) : null, 'kind' => 'price', 'title' => __('Смена цены'),
             'detail' => ($p->old_price ? Money::kztMinor((int) $p->old_price)->format() : '—').' → '.Money::kztMinor((int) $p->new_price)->format(), 'user' => $p->user_id,
         ]);
         $checks = ImeiCheck::query()->where('stock_unit_id', $unit->id)->get()->map(fn ($c) => [

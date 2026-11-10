@@ -5,12 +5,14 @@ namespace App\Domain\Inventory\Services;
 use App\Domain\Inventory\Enums\ImeiCheckResult;
 use App\Domain\Inventory\Models\ImeiCheck;
 use App\Domain\Inventory\Models\StockUnit;
+use App\Domain\Storefront\Support\SiteChange;
 use App\Domain\Tenancy\Access\AccessChecker;
 use App\Domain\Tenancy\Access\Exceptions\AccessDenied;
 use App\Models\User;
 use App\Support\Tenancy\CurrentOrganization;
 use App\Support\Tenancy\Exceptions\CrossOrganizationViolation;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 
 /** «Отметить госбазу» (architecture §2.9): who, when, result. A sale requires a fresh «registered» mark. */
 class ImeiCheckService
@@ -27,7 +29,7 @@ class ImeiCheckService
             throw CrossOrganizationViolation::make(StockUnit::class, (int) $unit->organization_id, $current);
         }
 
-        return ImeiCheck::query()->create([
+        return DB::transaction(fn () => tap(ImeiCheck::query()->create([
             'stock_unit_id' => $unit->id,
             'imei' => $unit->imei1 ?? $unit->serial,
             'result' => $result->value,
@@ -35,6 +37,6 @@ class ImeiCheckService
             'checked_by' => $user->id,
             'checked_at' => $at ?? now(),
             'comment' => $comment,
-        ]);
+        ]), fn () => SiteChange::units([$unit->id], 'imei')));
     }
 }

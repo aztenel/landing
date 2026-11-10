@@ -1,9 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap');
+/* Storefront (TZ 05 §13.4): self-hosted Onest, Tailwind 3.4, minimum JS. Chrome 109 / Safari iOS 15. */
+@import './fonts.css';
 @import './tokens.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body { @apply font-sans antialiased; }
-.scroll-x { overflow-x: auto; scrollbar-width: none; }
+body { @apply font-sans antialiased bg-white text-foreground; }
+.scroll-x { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory; }
 .scroll-x::-webkit-scrollbar { display: none; }
+.scroll-x > * { scroll-snap-align: start; }
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+.prose-site p { margin: 0 0 .75rem; }
+.prose-site h2 { font-weight: 700; font-size: 1.125rem; margin: 1.25rem 0 .5rem; }
+.prose-site ul { list-style: disc; padding-left: 1.25rem; margin: 0 0 .75rem; }

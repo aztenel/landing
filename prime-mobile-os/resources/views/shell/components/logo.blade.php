@@ -12,6 +12,6 @@
         <path d="M21 49 32 33.5" stroke="url(#{{ $uid }})" stroke-width="2.2" stroke-linecap="round" opacity=".55"/>
     </svg>
     @if ($wordmark)
-        <span class="leading-none {{ $size === 'lg' ? 'text-xl' : 'text-[15px]' }} tracking-[-.01em]"><span class="font-semibold">Prime</span> <span class="font-normal text-muted-foreground">Mobile</span></span>
+        <span class="whitespace-nowrap leading-none {{ $size === 'lg' ? 'text-xl' : 'text-[15px]' }} tracking-[-.01em]"><span class="font-semibold">Prime</span> <span class="font-normal text-muted-foreground">Mobile</span></span>
     @endif
 </span>

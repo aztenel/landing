@@ -42,6 +42,7 @@ class StockUnit extends Model
      */
     protected $fillable = [
         'organization_id', 'grade', 'battery_percent', 'year', 'defects', 'description', 'show_on_site', 'created_by',
+        'site_description_ru', 'site_description_kk', 'site_badges', 'site_pinned_rank', 'site_pinned_until', 'site_hidden_by', 'site_hidden_at',
     ];
 
     /** Never mass-assignable: maintained by the ledger. */
@@ -53,6 +54,8 @@ class StockUnit extends Model
             'status' => UnitStatus::class,
             'condition' => UnitCondition::class,
             'show_on_site' => 'boolean',
+            'site_badges' => 'array',
+            'compare_at_price' => 'integer',
             'cost_unknown' => 'boolean',
             'sale_price' => 'integer',
             'cost_kzt' => 'integer',

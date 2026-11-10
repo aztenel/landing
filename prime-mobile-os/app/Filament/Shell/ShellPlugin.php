@@ -9,6 +9,7 @@ use App\Http\Middleware\Shell\EnsurePasswordChanged;
 use App\Http\Middleware\Shell\EnsureScreenUnlocked;
 use App\Http\Middleware\Shell\ErpResponseHeaders;
 use App\Support\Ui\Accent;
+use App\Support\Ui\ErpSearch;
 use App\Support\Ui\MenuGroup;
 use Filament\Contracts\Plugin;
 use Filament\Enums\ThemeMode;
@@ -60,6 +61,7 @@ class ShellPlugin implements Plugin
             ->maxContentWidth(MaxWidth::Full)
             ->sidebarWidth('236px')
             ->navigationGroups(MenuGroup::labels())
+            ->globalSearch(ErpSearch::class)
             ->homeUrl(fn (): string => app(HomeResolver::class)->url())
             ->authMiddleware([
                 EnsureDeviceAllowed::class,

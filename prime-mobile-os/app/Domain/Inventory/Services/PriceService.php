@@ -6,6 +6,7 @@ use App\Domain\Catalog\Models\AccessoryPrice;
 use App\Domain\Catalog\Models\VariantPrice;
 use App\Domain\Inventory\Models\PriceChange;
 use App\Domain\Inventory\Models\StockUnit;
+use App\Domain\Storefront\Support\SiteChange;
 use App\Domain\Tenancy\Access\AccessChecker;
 use App\Domain\Tenancy\Access\Exceptions\AccessDenied;
 use App\Domain\Tenancy\Access\Exceptions\ApprovalRequired;
@@ -23,13 +24,16 @@ class PriceService
 {
     public function __construct(private readonly AccessChecker $access) {}
 
-    public function setUnitPrice(StockUnit $unit, Money $price, User $user, string $reason = 'manual'): StockUnit
+    /** @param bool $showOld TZ 05 §6.2 «Показать прежнюю цену зачёркнутой» on the site */
+    public function setUnitPrice(StockUnit $unit, Money $price, User $user, string $reason = 'manual', bool $showOld = false): StockUnit
     {
         $this->authorize($user, $unit->sale_price, $price->amount);
 
-        return DB::transaction(function () use ($unit, $price, $user, $reason) {
+        return DB::transaction(function () use ($unit, $price, $user, $reason, $showOld) {
+            $old = $unit->sale_price ?? VariantPrice::query()->where('variant_id', $unit->variant_id)->value('price_kzt');
             PriceChange::query()->create(['subject_type' => 'stock_unit', 'subject_id' => $unit->id, 'old_price' => $unit->sale_price, 'new_price' => $price->amount, 'reason' => $reason, 'user_id' => $user->id]);
-            $unit->forceFill(['sale_price' => $price->amount])->save();
+            $unit->forceFill(['sale_price' => $price->amount] + ($showOld && $old > $price->amount ? ['compare_at_price' => $old] : []))->save();
+            SiteChange::units([$unit->id], 'price');
 
             return $unit;
         });
@@ -43,6 +47,7 @@ class PriceService
         return DB::transaction(function () use ($current, $variantId, $price, $user, $reason) {
             PriceChange::query()->create(['subject_type' => 'variant', 'subject_id' => $variantId, 'old_price' => $current->price_kzt, 'new_price' => $price->amount, 'reason' => $reason, 'user_id' => $user->id]);
             $current->fill(['price_kzt' => $price->amount])->save();
+            SiteChange::units(StockUnit::query()->where('variant_id', $variantId)->whereNull('sale_price')->whereIn('status', ['in_stock', 'reserved', 'ordered'])->pluck('id')->all(), 'price');
 
             return $current;
         });
@@ -56,6 +61,7 @@ class PriceService
         return DB::transaction(function () use ($current, $accessoryId, $price, $user, $reason) {
             PriceChange::query()->create(['subject_type' => 'accessory', 'subject_id' => $accessoryId, 'old_price' => $current->price_kzt, 'new_price' => $price->amount, 'reason' => $reason, 'user_id' => $user->id]);
             $current->fill(['price_kzt' => $price->amount])->save();
+            SiteChange::accessories('price');
 
             return $current;
         });

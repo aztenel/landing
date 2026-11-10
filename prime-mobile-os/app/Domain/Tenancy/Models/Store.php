@@ -13,10 +13,10 @@ class Store extends Model
 {
     use BelongsToOrganization, TracksCreator;
 
-    protected $fillable = ['organization_id', 'name', 'address', 'phone', 'is_active', 'sort', 'created_by'];
+    protected $fillable = ['organization_id', 'name', 'address', 'phone', 'is_active', 'sort', 'created_by', 'meta'];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['is_active' => 'boolean', 'meta' => 'array'];   // meta: site fields (TZ 05 §2.3) whatsapp, hours, map_url, site_hidden …
     }
 }

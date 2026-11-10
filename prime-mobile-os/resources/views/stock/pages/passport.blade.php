@@ -12,8 +12,12 @@
     <a href="{{ \App\Filament\Stock\Pages\Phones::getUrl() }}" class="inline-flex items-center gap-1 text-sm text-muted-foreground"><x-ui::icon name="chev-left" class="h-4 w-4" /> {{ __('Склад') }}</a>
 
     <div class="grid grid-cols-[minmax(0,1fr)] gap-4 desk:grid-cols-[280px_minmax(0,1fr)]">
-        <div class="flex aspect-square items-center justify-center rounded-2xl bg-muted desk:aspect-auto desk:h-72">
-            <x-ui::icon name="phone" class="h-16 w-16 text-muted-foreground" />
+        <div class="flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-muted desk:aspect-auto desk:h-72">
+            @if ($sitePhotos->firstWhere('status', 'ready'))
+                <img src="{{ $sitePhotos->firstWhere('status', 'ready')->url('lg') }}" alt="" class="h-full w-full object-cover">
+            @else
+                <x-ui::icon name="phone" class="h-16 w-16 text-muted-foreground" />
+            @endif
         </div>
         <div class="space-y-3">
             <div class="flex flex-wrap items-start gap-3">
@@ -129,7 +133,7 @@
                 @if ($unit->cost_currency && $unit->cost_currency !== 'KZT')<div><dt class="text-muted-foreground">{{ __('Закуп') }}</dt><dd class="num">${{ number_format(((int) $unit->cost_amount_orig) / 100, 2, '.', ' ') }} × {{ $unit->cost_rate }}</dd></div>@endif
             </dl>
         @else
-            <p class="p-6 text-sm text-muted-foreground">{{ __('Фото и показ на сайте подключаются с модулем сайта.') }}</p>
+            @include('stock.partials.passport-site')
         @endif
     </div>
 
@@ -157,6 +161,7 @@
                 @if ($modal === 'price')
                     <h3 class="text-lg font-semibold">{{ __('Новая цена') }}</h3>
                     <input type="text" inputmode="numeric" wire:model="newPrice" class="num mt-3 w-full rounded-lg border-input bg-background text-base" placeholder="{{ $price ? number_format($price / 100, 0, '', ' ') : '' }}" autofocus>
+                    <label class="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" wire:model="showOld" class="rounded border-input text-primary">{{ __('Показать прежнюю цену зачёркнутой на сайте') }}</label>
                     <div class="mt-4 flex justify-end gap-2"><button type="button" wire:click="$set('modal', null)" class="{{ $btn }}">{{ __('Отмена') }}</button><button type="button" wire:click="price" class="h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-white">{{ __('Сохранить') }}</button></div>
                 @else
                     <h3 class="text-lg font-semibold">{{ __('Проверка госбазы IMEI') }}</h3>

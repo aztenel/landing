@@ -3,6 +3,7 @@
 namespace App\Filament\Sales\Pages;
 
 use App\Domain\Catalog\Models\Variant;
+use App\Domain\Catalog\Models\VariantPrice;
 use App\Domain\Counterparties\Models\Customer;
 use App\Domain\Inventory\Models\StockUnit;
 use App\Domain\Ledger\Enums\ReversalReason;
@@ -20,6 +21,7 @@ use App\Support\Tenancy\CurrentOrganization;
 use App\Support\Ui\MenuGroup;
 use App\Support\Ui\WorkingStore;
 use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
  * Э7 «Заказы» (/orders): orders of the stores — active, overdue, closed; new order for a phone in stock (scan) or a
@@ -64,6 +66,16 @@ class Orders extends Page
         return __('Заказы');
     }
 
+    /** From a site request «Забронировать» (TZ 05 §11.3): /orders?unit=PM-10482 opens the new order with the phone. */
+    public function mount(): void
+    {
+        if ($code = request()->query('unit')) {
+            $this->newOrder();
+            $this->form['code'] = (string) $code;
+            $this->findUnit();
+        }
+    }
+
     public function newOrder(): void
     {
         $this->form = ['customer_id' => null, 'code' => '', 'unit_id' => null, 'variant_id' => null, 'price' => '', 'prepay' => '', 'method' => 'cash', 'note' => ''];
@@ -91,7 +103,7 @@ class Orders extends Page
         $this->form['variant_id'] = $v->id;
         $this->form['unit_id'] = null;
         $this->variantQuery = $v->title();
-        $price = \App\Domain\Catalog\Models\VariantPrice::query()->where('variant_id', $v->id)->value('price_kzt');
+        $price = VariantPrice::query()->where('variant_id', $v->id)->value('price_kzt');
         $this->form['price'] = $price ? (string) intdiv((int) $price, 100) : '';
     }
 
@@ -118,7 +130,7 @@ class Orders extends Page
             $this->form = null;
         } catch (UserFacingException|\InvalidArgumentException $e) {
             $this->error = $e->getMessage();
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+        } catch (ModelNotFoundException) {
             $this->error = __('Выберите клиента и телефон или вариант');
         }
     }

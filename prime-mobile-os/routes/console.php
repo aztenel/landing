@@ -28,3 +28,6 @@ Schedule::command('prime:shifts-tick')->everyMinute()->withoutOverlapping();
 
 // Orders: a hold without prepayment expires, with prepayment becomes «Просрочен» (TZ 01 П10.2)
 Schedule::command('prime:orders-tick')->everyFiveMinutes()->withoutOverlapping();
+
+// Storefront: nightly full check of the public cards against the warehouse (TZ 05 §8.6)
+Schedule::command('prime:site-reconcile')->dailyAt('03:40')->timezone('Asia/Almaty')->withoutOverlapping();
