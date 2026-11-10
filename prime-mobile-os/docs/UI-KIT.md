@@ -45,7 +45,7 @@ class Sale extends \Filament\Pages\Page
 
 ## 3. Маршруты, переводы, места в шапке
 
-- Маршруты модуля: `routes/modules/<slug>.php`, внутри `App\Support\Routing\ModuleRoutes::erp(fn () => …)` (ERP-домен, авторизация каркаса), `ModuleRoutes::erpGuest(…)` (без входа), для сайта — `ModuleRoutes::shop(…)`.
+- Маршруты модуля: `routes/modules/<slug>.php`, внутри `App\Support\Routing\ModuleRoutes::erp(fn () => …)` (ERP-домен, авторизация каркаса), `ModuleRoutes::erpGuest(…)` (без входа), для сайта — `ModuleRoutes::storefront(…)` (домен сайта, имена `storefront.*`).
 - Казахский перевод: `lang/modules/<slug>/kk.json` (ключ — русский текст).
 - Места каркаса (`App\Support\Ui\ShellHook`): `TOPBAR_BELL` (колокольчик модуля заявок), `TOPBAR_STATUS` (смена), `TOPBAR_RATE` (курс), `SIDEBAR_STORE_STATUS`, `SIDEBAR_FOOTER`, `USER_MENU_ITEMS`, `MOBILE_HEADER_END`, `BANNER`:
 
