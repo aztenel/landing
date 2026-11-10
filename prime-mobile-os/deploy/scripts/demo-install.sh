@@ -293,7 +293,10 @@ ls -1dt $BASE/releases/*/ | tail -n +4 | xargs -r rm -rf
 
 # ---------------------------------------------------------------- 9. check
 say "9/9 Проверка"
-CODE=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$ERP:80:127.0.0.1" --resolve "$ERP:443:127.0.0.1" -k "$SCHEME://$ERP/health" || true)
+for i in $(seq 1 30); do    # PHP and the workers need a few seconds after the restart
+    CODE=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$ERP:80:127.0.0.1" --resolve "$ERP:443:127.0.0.1" -k "$SCHEME://$ERP/health" || true)
+    [ "$CODE" = 200 ] && break; sleep 2
+done
 if [ "$CODE" = 200 ]; then
     echo "ERP отвечает: всё в порядке"
 else
