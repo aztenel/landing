@@ -233,3 +233,27 @@ it('keeps one customer under the firm debt ceiling of 300 000 ₸ unless the own
     expect(SaleDraft::make($w->store, $w->owner)->customer($w->customer)->unit($w->phone(), Money::kzt(900000))
         ->cash(Money::kzt(820000))->debt(Money::kzt(80000), now()->addDays(10))->post($w->owner)->isPosted())->toBeTrue();
 });
+
+it('never sells a phone with the registry mark «Не верифицирован» or «Заблокирован», even with the check switched off (audit №55)', function () {
+    foreach (['not_registered', 'blocked'] as $result) {
+        $w = world(['sales' => ['require_imei_check' => false]]);
+        $unit = $w->phone(imeiCheck: false);
+        ImeiCheck::query()->create(['stock_unit_id' => $unit->id, 'imei' => $unit->imei1, 'result' => $result, 'checked_by' => $w->owner->id, 'checked_at' => now()]);
+
+        expect(fn () => SaleDraft::make($w->store, $w->owner)->unit($unit, Money::kzt(549000))->cash(Money::kzt(549000))->post($w->owner))
+            ->toThrow(PostingException::class, 'Продажа запрещена');
+    }
+});
+
+it('keeps the activity log append-only and turns «show on site» on by default (audit №14, №44)', function () {
+    $w = world();
+    activity('test')->log('something');
+    $db = \Illuminate\Support\Facades\DB::class;
+    expect(fn () => $db::transaction(fn () => $db::table('activity_log')->update(['description' => 'changed'])))->toThrow(\Illuminate\Database\QueryException::class);
+    expect(fn () => $db::transaction(fn () => $db::table('activity_log')->delete()))->toThrow(\Illuminate\Database\QueryException::class);
+
+    $doc = \App\Domain\Inventory\Drafts\PurchaseDraft::make($w->store, $w->supplier)->unit($w->iphone, \Tests\Support\World::imei(), Money::kzt(450000))
+        ->onCredit(now()->addDays(5))->post($w->owner);
+    $unitId = \App\Domain\Inventory\Models\PurchaseLine::query()->where('document_id', $doc->id)->value('stock_unit_id');
+    expect(\App\Domain\Inventory\Models\StockUnit::query()->find($unitId)->show_on_site)->toBeTrue();
+});

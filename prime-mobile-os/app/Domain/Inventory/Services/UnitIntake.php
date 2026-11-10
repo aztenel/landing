@@ -79,7 +79,7 @@ class UnitIntake
             'imei1' => $ids[IdentifierKind::Imei1->value] ?? null,
             'imei2' => $ids[IdentifierKind::Imei2->value] ?? null,
             'serial' => $ids[IdentifierKind::Serial->value] ?? null,
-            'show_on_site' => (bool) $line->show_on_site,
+            'show_on_site' => $line->show_on_site === null ? true : (bool) $line->show_on_site, // on by default (audit №44)
             'sale_price' => $line->sale_price,
             'supplier_id' => $supplierId,
             'purchase_document_id' => $ctx->document->id,

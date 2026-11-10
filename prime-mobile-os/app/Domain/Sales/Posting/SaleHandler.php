@@ -442,13 +442,17 @@ class SaleHandler extends AbstractDocumentHandler
             throw PostingException::because('unit_other_store', "Телефон {$unit->public_code} числится в другом магазине");
         }
 
-        // госбаза IMEI (TZ 02 §10.4 p.3): registered, not older than N days; owner may switch the rule off
+        // госбаза IMEI (audit №55): «Не верифицирован» and «Заблокирован» are never sold, whatever the settings;
+        // the owner's switch only drops the need of a fresh «Верифицирован» mark
+        $check = $unit->imei1 ? $unit->latestImeiCheck() : null;
+        if ($check && in_array($check->result, [ImeiCheckResult::NotRegistered, ImeiCheckResult::Blocked], true)) {
+            throw PostingException::because('imei_not_registered', "Госбаза: IMEI телефона {$unit->public_code} — «{$check->result->label()}». Продажа запрещена: зарегистрируйте IMEI и отметьте проверку заново");
+        }
         if ($ctx->settings()->requireImeiCheck() && $unit->imei1) {
-            $check = $unit->latestImeiCheck();
             $maxAge = $ctx->settings()->imeiCheckMaxAgeDays();
             $message = match (true) {
                 $check === null => 'Нет отметки госбазы IMEI — проверьте IMEI перед продажей',
-                $check->result !== ImeiCheckResult::Registered => 'Госбаза: IMEI не зарегистрирован — продажа только с разрешения владельца',
+                $check->result === ImeiCheckResult::Error => 'Госбаза не ответила — проверьте IMEI ещё раз',
                 $check->checked_at->lt($ctx->now->subDays($maxAge)) => "Проверка госбазы старше {$maxAge} дней — проверьте IMEI ещё раз",
                 default => null,
             };
