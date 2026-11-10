@@ -16,7 +16,7 @@ class PosServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singletonIf(TradeInProvider::class, NullTradeInProvider::class);
+        $this->app->singletonIf(TradeInProvider::class, \App\Domain\TradeIn\TradeInPosProvider::class);
     }
 
     public function boot(): void

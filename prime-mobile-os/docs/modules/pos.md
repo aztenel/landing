@@ -15,7 +15,7 @@
 
 | Что | Контракт |
 |---|---|
-| Trade-in (F8) | интерфейс `App\Domain\Pos\Contracts\TradeInProvider` (`available()`, `startUrl(Cart)`). Модуль trade-in привязывает свою реализацию в своём провайдере; пока её нет — `NullTradeInProvider`, F8 пишет «Trade-in подключается». Зачёт попадает в чек оплатой `tradein` через свой вход (касса этот способ сама не принимает). |
+| Trade-in (F8) | **подключён**: `App\Domain\TradeIn\TradeInPosProvider` открывает акт `/tradein/new?tab=N` в режиме «в зачёт». Акт-черновик встаёт в чек (`CartService::attachTradeIn`), при «Провести» акт и чек проводятся одной операцией, акт первым (`Poster::postMany`). |
 | Печать чека | маршрут `erp.pos.receipt` (`/sale/receipt/{document}`), вид `pos.receipt` — временный чек 80 мм. Модуль печати (Ф1) заменяет **вид**, имя маршрута оставляет. |
 | Продажа по заказу | `CartService::loadOrder($cart, $user, $order)` — телефон, клиент и предоплата заказа. |
 | Возврат (F10) | пока сообщение; модуль чеков/возвратов подключит переход. |

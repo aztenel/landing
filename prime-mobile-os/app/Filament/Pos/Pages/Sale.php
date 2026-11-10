@@ -407,7 +407,7 @@ class Sale extends Page
             'tendered' => isset($p['tendered']) ? (string) intdiv((int) $p['tendered'], Money::TENGE) : '',
             'due_date' => $p['due_date'] ?? now()->addDays(30)->toDateString(),
         ])->all();
-        $this->payRows = $rows ?: [['method' => 'cash', 'amount' => (string) intdiv($t['total'], Money::TENGE), 'tendered' => '', 'due_date' => now()->addDays(30)->toDateString()]];
+        $this->payRows = $rows ?: [['method' => 'cash', 'amount' => (string) intdiv($t['total'] - (int) ($t['tradein']['amount'] ?? 0), Money::TENGE), 'tendered' => '', 'due_date' => now()->addDays(30)->toDateString()]];
         $this->modal = 'payment';
     }
 
@@ -446,7 +446,8 @@ class Sale extends Page
     /** Tenge left to distribute (+ not enough, − too much). */
     public function payLeft(): int
     {
-        $total = intdiv($this->svc()->totals($this->cart())['total'], Money::TENGE);
+        $t = $this->svc()->totals($this->cart());
+        $total = intdiv($t['total'] - (int) ($t['tradein']['amount'] ?? 0), Money::TENGE);
 
         return $total - array_sum(array_map(fn ($r) => (int) preg_replace('/\D/', '', (string) $r['amount']), $this->payRows));
     }
@@ -595,6 +596,11 @@ class Sale extends Page
             return;
         }
         $this->redirect($provider->startUrl($this->cart()));
+    }
+
+    public function dropTradeIn(): void
+    {
+        $this->attempt(fn () => $this->svc()->detachTradeIn($this->cart()));
     }
 
     public function goReturn(): void

@@ -60,7 +60,7 @@ it('delivers pending events in order, retries a failing listener later and does 
 
     // not yet: the next attempt waits; then it is delivered
     expect(app(OutboxDispatcher::class)->run()['processed'])->toBe(0);
-    DB::table('outbox_events')->where('id', $row->id)->update(['available_at' => now()->subSecond()]);
+    DB::table('outbox_events')->where('id', $row->id)->update(['available_at' => now()->subMinute()]);
     $fail = false;
     expect(app(OutboxDispatcher::class)->run())->toBe(['processed' => 1, 'failed' => 0])
         ->and($seen)->toBe(['document.posted'])

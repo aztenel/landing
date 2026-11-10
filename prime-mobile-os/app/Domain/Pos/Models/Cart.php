@@ -20,7 +20,7 @@ class Cart extends Model
     protected $guarded = ['id', 'organization_id'];
 
     public const EMPTY = ['lines' => [], 'customer_id' => null, 'check_discount' => 0, 'discount_reason' => null, 'payments' => [],
-        'source' => null, 'comment' => null, 'delivery' => null, 'order_document_id' => null];
+        'source' => null, 'comment' => null, 'delivery' => null, 'order_document_id' => null, 'tradein' => null];
 
     protected function casts(): array
     {

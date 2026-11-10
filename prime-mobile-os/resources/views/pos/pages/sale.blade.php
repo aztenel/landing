@@ -198,6 +198,13 @@
                     </div>
                 @endforelse
 
+                @if ($t['tradein'])
+                    <div class="flex items-start gap-3 border-b border-border py-3">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted"><x-ui::icon name="swap" class="h-5 w-5 text-muted-foreground" /></div>
+                        <div class="min-w-0 flex-1"><div class="font-medium">{{ __('Trade-in в зачёт') }}</div><div class="text-xs text-muted-foreground">{{ __('акт проводится вместе с чеком') }}</div></div>
+                        <div class="text-right"><div class="num font-semibold">−{{ $money($t['tradein']['amount']) }}</div><button type="button" wire:click="dropTradeIn" class="text-xs text-muted-foreground hover:text-bad">{{ __('убрать') }}</button></div>
+                    </div>
+                @endif
                 @if ($t['lines'] !== [])
                     <div class="hidden gap-2 desk:flex">
                         <button type="button" class="{{ $btn }} flex-1" disabled title="{{ __('Доставка подключается вместе со списком чеков') }}"><x-ui::icon name="truck" class="h-4 w-4" /> {{ __('Доставка') }}</button>

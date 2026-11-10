@@ -319,6 +319,21 @@ class CartService
         }
     }
 
+    /** «Добавить в чек» from the trade-in act (F8): a draft act of this store with a part «в зачёт». */
+    public function attachTradeIn(Cart $cart, Document $act): void
+    {
+        $row = \App\Domain\TradeIn\Models\TradeInAct::query()->where('document_id', $act->id)->first();
+        if (! $act->isDraft() || $act->type->value !== 'tradein' || (int) $act->store_id !== (int) $cart->store_id || ! $row || $row->offset_amount <= 0) {
+            throw PostingException::because('bad_tradein', 'Этот акт нельзя добавить в чек');
+        }
+        $this->change($cart, fn (array $d) => ['tradein' => ['document_id' => $act->id, 'amount' => (int) $row->offset_amount], 'customer_id' => $d['customer_id'] ?? $row->customer_id] + $d);
+    }
+
+    public function detachTradeIn(Cart $cart): void
+    {
+        $this->change($cart, fn (array $d) => ['tradein' => null] + $d);
+    }
+
     public function clear(Cart $cart, User $user): void
     {
         foreach ($cart->get('lines') as $line) {
@@ -380,13 +395,15 @@ class CartService
         $after = $subtotal - $lineDiscounts;
         $checkDiscount = min((int) $cart->get('check_discount', 0), $after);
         $total = $after - $checkDiscount;
-        $paid = (int) collect($cart->get('payments'))->sum('amount');
+        $tradein = $cart->get('tradein');
+        $paid = (int) collect($cart->get('payments'))->sum('amount') + (int) ($tradein['amount'] ?? 0);
         $cash = collect($cart->get('payments'))->firstWhere('method', 'cash');
         $change = $cash && isset($cash['tendered']) ? (int) $cash['tendered'] - (int) $cash['amount'] : 0;
 
         return [
             'lines' => $lines, 'subtotal' => $subtotal, 'line_discounts' => $lineDiscounts, 'after_lines' => $after,
             'check_discount' => $checkDiscount, 'total' => $total, 'paid' => $paid, 'change' => max(0, $change), 'reserve_until' => $reserveUntil,
+            'tradein' => $tradein,
         ];
     }
 
@@ -395,7 +412,8 @@ class CartService
     /** Quick method on the whole sum: «Наличные · Карта · Kaspi · В долг». */
     public function payAllWith(Cart $cart, string $method, ?string $dueDate = null): void
     {
-        $total = $this->totals($cart)['total'];
+        $t = $this->totals($cart);
+        $total = $t['total'] - (int) ($t['tradein']['amount'] ?? 0);
         $this->setPayments($cart, [['method' => $method, 'amount' => $total] + ($method === 'debt' ? ['due_date' => $dueDate ?? now()->addDays(30)->toDateString()] : [])]);
     }
 
@@ -426,7 +444,11 @@ class CartService
 
         $draft = $this->draft($cart, $user);
         try {
-            $document = $this->poster->post($draft, $user);
+            // trade-in «в зачёт»: the act and the check in one operation, the act first (audit №40)
+            $act = $cart->get('tradein.document_id') ? Document::query()->find($cart->get('tradein.document_id')) : null;
+            $document = $act
+                ? $this->poster->postMany([$act, $draft], $user)[1]
+                : $this->poster->post($draft, $user);
         } catch (ApprovalRequired $e) {
             return ['status' => 'approval', 'message' => $e->getMessage()];
         }
@@ -487,6 +509,9 @@ class CartService
             } else {
                 $d->accessory((int) $line['accessory_id'], (int) $line['qty'], Money::kztMinor((int) $this->accessoryPrice((int) $line['accessory_id'])), Money::kztMinor((int) $line['discount']));
             }
+        }
+        if ($cart->get('tradein.document_id')) {
+            $d->tradeIn((int) $cart->get('tradein.document_id'), Money::kztMinor((int) $cart->get('tradein.amount')));
         }
         if ($cart->get('check_discount')) {
             $d->discount(Money::kztMinor((int) $cart->get('check_discount')));
