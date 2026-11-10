@@ -17,6 +17,30 @@ use Illuminate\Database\Eloquent\Model;
  */
 trait HasSensitiveFields
 {
+    /**
+     * Hidden by default (audit №21): every model loaded while a user is logged in hides the fields that user may not
+     * see, so HTML, JSON, Livewire snapshots and Excel exports of any screen are safe even when the screen forgets
+     * forViewer(). Property access in domain code ($unit->cost_kzt) is not affected — only serialization.
+     */
+    public static function bootHasSensitiveFields(): void
+    {
+        static::retrieved(function (self $model) {
+            $user = auth()->user();
+            if ($user instanceof User) {
+                $model->makeHidden(static::hiddenFieldsForCached($user));
+            }
+        });
+    }
+
+    /** @return list<string> */
+    private static function hiddenFieldsForCached(User $viewer): array
+    {
+        static $cache = [];
+        $key = spl_object_id(app()).':'.static::class.':'.$viewer->id;
+
+        return $cache[$key] ??= static::hiddenFieldsFor($viewer);
+    }
+
     /** @return array<string, list<string>> permission that opens the fields => fields */
     abstract public static function sensitiveFields(): array;
 

@@ -131,3 +131,15 @@ it('checks the stores of an employee with the marks «Продажи» and «Ф�
     expect(fn () => app(\App\Domain\Tenancy\Services\OrganizationProvisioner::class)
         ->addMember($w->org, \App\Models\User::factory()->create(), RoleTemplates::SELLER, []))->toThrow(InvalidArgumentException::class);
 });
+
+it('hides cost fields from a logged-in seller by default, on any load (audit №21)', function () {
+    $w = world();
+    $unit = $w->phone();
+
+    $this->actingAs($w->seller);
+    $asSeller = StockUnit::query()->find($unit->id)->toArray();
+    expect($asSeller)->not->toHaveKey('cost_kzt')->and($asSeller)->toHaveKey('public_code');
+
+    $this->actingAs($w->owner);
+    expect(StockUnit::query()->find($unit->id)->toArray())->toHaveKey('cost_kzt');
+});
