@@ -2,6 +2,7 @@
 
 namespace App\Domain\Sales\Posting;
 
+use App\Domain\Money\Models\MoneyAccount;
 use App\Domain\Loyalty\Services\DebtBonusAccrual;
 use App\Domain\Counterparties\Enums\CounterpartyType;
 use App\Domain\Inventory\Enums\UnitAction;
@@ -111,6 +112,18 @@ class CustomerReturnHandler extends AbstractDocumentHandler
         }
         foreach ($this->refunds($document) as $refund) {
             $method = PaymentMethodCode::tryFrom($refund->method);
+            if ($method === PaymentMethodCode::ExchangeOffset) {
+                // exchange (audit №34): this part goes into the new sale of the same group, posted right after
+                if (! $document->exchange_group_id) {
+                    throw PostingException::because('exchange_without_sale', 'Зачёт в новую покупку — только при обмене');
+                }
+                $refund->forceFill(['account_id' => MoneyAccount::byCode(MoneyAccount::CODE_EXCHANGE_OFFSET)->id])->save();
+                if ($refund->amount <= 0 || $refund->amount % Money::TENGE !== 0) {
+                    throw PostingException::because('bad_amount', 'Сумма возврата — целые тенге больше нуля');
+                }
+
+                continue;
+            }
             if (! $method || ! ($method->isMoney() || $method === PaymentMethodCode::Debt)) {
                 throw PostingException::because('bad_refund', 'Вернуть можно деньгами на счёт или уменьшением долга клиента');
             }

@@ -599,7 +599,7 @@ class Sale extends Page
 
     public function goReturn(): void
     {
-        $this->error = __('Возврат открывается из списка чеков (подключается в следующем обновлении)');
+        $this->redirect(\App\Filament\Sales\Pages\Returns::getUrl());
     }
 
     public function sellOrder(int $orderId): void

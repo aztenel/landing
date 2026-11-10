@@ -79,6 +79,12 @@ final class CustomerReturnDraft extends DraftBuilder
         return $this->refund(PaymentMethodCode::Debt, $amount);
     }
 
+    /** Exchange: this part goes into the new sale (Exchange::post, audit №34). */
+    public function refundToExchange(Money $amount): self
+    {
+        return $this->refund(PaymentMethodCode::ExchangeOffset, $amount);
+    }
+
     protected function writeDetails(Document $document): void
     {
         CustomerReturn::query()->create([

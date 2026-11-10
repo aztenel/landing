@@ -32,6 +32,7 @@ use App\Domain\Ledger\Posting\LockPlan;
 use App\Domain\Ledger\Posting\PostingContext;
 use App\Domain\Money\Enums\ArticleCode;
 use App\Domain\Money\Enums\PaymentMethodCode;
+use App\Domain\Money\Models\MoneyAccount;
 use App\Domain\Money\Models\PaymentMethod;
 use App\Domain\Sales\Models\CustomerReturn;
 use App\Domain\Sales\Models\Sale;
@@ -147,8 +148,9 @@ class SaleHandler extends AbstractDocumentHandler
                 throw PostingException::because('tradein_without_act', 'Зачёт trade-in принимается только вместе с актом trade-in');
             }
             if ($method === PaymentMethodCode::ExchangeOffset) {
-                // only in the pair «return + new sale» posted as one operation (audit №34); the exchange screen plugs it in
-                throw PostingException::because('exchange_without_return', 'Зачёт возврата принимается только при обмене вместе с возвратом');
+                // only in the pair «return + new sale» posted as one operation, the return first (audit №34)
+                $this->assertExchangePair($document, (int) $payments->where('method', PaymentMethodCode::ExchangeOffset)->sum('amount'));
+                $p->forceFill(['account_id' => MoneyAccount::byCode(MoneyAccount::CODE_EXCHANGE_OFFSET)->id])->save();
             }
             if ($method === PaymentMethodCode::KaspiShop && $payments->count() !== 1) {
                 throw PostingException::because('kaspi_shop_single', 'Заказ Kaspi Магазина оплачивается только способом «Kaspi Магазин» целиком');
@@ -350,6 +352,9 @@ class SaleHandler extends AbstractDocumentHandler
                     }
                     $changes = ['commission_amount' => $commission, 'change' => $p->method->isCash() && $p->tendered !== null ? $p->tendered - $p->amount : 0];
                     break;
+                case $p->method === PaymentMethodCode::ExchangeOffset:
+                    $this->money->record($ctx, (int) $p->account_id, (int) $p->amount, ArticleCode::Revenue, $customerAttrs + ['sale_payment_id' => $p->id, 'comment' => 'Выручка (зачёт возврата при обмене)']);
+                    break;
                 case $p->method === PaymentMethodCode::TradeIn:
                     if ($this->money->account((int) $p->account_id)->currency !== Currency::KZT) {
                         throw PostingException::because('kzt_only', 'Зачёт trade-in — только в тенге');
@@ -405,6 +410,20 @@ class SaleHandler extends AbstractDocumentHandler
     }
 
     private ?Order $order = null;
+
+    /** Exchange (audit №34): the return of the same group is already posted and gives exactly this offset. */
+    private function assertExchangePair(Document $document, int $offset): void
+    {
+        if (! $document->exchange_group_id) {
+            throw PostingException::because('exchange_without_return', 'Зачёт возврата принимается только при обмене вместе с возвратом');
+        }
+        $returns = Document::query()->where('exchange_group_id', $document->exchange_group_id)->where('type', DocumentType::CustomerReturn->value)
+            ->where('status', DocumentStatus::Posted->value)->pluck('id');
+        $given = (int) \App\Domain\Sales\Models\CustomerReturnPayment::query()->whereIn('document_id', $returns)->where('method', PaymentMethodCode::ExchangeOffset->value)->sum('amount');
+        if ($returns->isEmpty() || $given !== $offset) {
+            throw PostingException::because('exchange_mismatch', 'Зачёт обмена '.Money::kztMinor($offset)->format().' не равен сумме возврата в зачёт '.Money::kztMinor($given)->format());
+        }
+    }
 
     private function openOrder(PostingContext $ctx, Sale $sale, Collection $lines): Order
     {
