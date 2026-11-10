@@ -11,7 +11,7 @@ class Supplier extends Model
 {
     use BelongsToOrganization, TracksCreator;
 
-    protected $fillable = ['organization_id', 'name', 'phone', 'bin_iin', 'contact_person', 'is_repair_master', 'is_active', 'comment', 'created_by'];
+    protected $fillable = ['organization_id', 'name', 'phone', 'bin_iin', 'contact_person', 'is_repair_master', 'is_active', 'comment', 'created_by', 'currency', 'payment_days', 'city', 'whatsapp', 'requisites'];
 
     protected function casts(): array
     {
