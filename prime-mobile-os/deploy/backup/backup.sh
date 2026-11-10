@@ -5,7 +5,7 @@
 #   PGHOST PGUSER PGPASSWORD PGDATABASE  RESTIC_REPOSITORY  RESTIC_PASSWORD  (+ AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for S3)
 # Recommended upgrade for «на любую минуту»: pgBackRest with WAL archiving (see deploy/README.md).
 set -euo pipefail
-source /etc/prime/backup.env
+set -a; source /etc/prime/backup.env; set +a   # exported: pg_dump and restic read them from the environment
 APP=/var/www/prime/current
 STATUS=/var/www/prime/shared/storage/app/backup-status.json
 WORK=$(mktemp -d)

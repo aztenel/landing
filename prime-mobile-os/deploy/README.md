@@ -10,7 +10,7 @@
 
 ## 2. Программы
 ```bash
-apt install nginx postgresql-16 redis-server supervisor php8.3-fpm php8.3-{pgsql,redis,gd,exif,intl,mbstring,xml,zip,bcmath,curl} composer nodejs npm restic jq certbot python3-certbot-nginx fail2ban
+apt install nginx postgresql-16 redis-server supervisor php8.3-fpm php8.3-{cli,pgsql,redis,gd,intl,mbstring,xml,zip,bcmath,curl} composer nodejs npm restic jq certbot python3-certbot-nginx fail2ban
 ```
 - SSH только по ключу, нестандартный порт, fail2ban. Наружу — только 80 и 443. PostgreSQL и Redis слушают 127.0.0.1.
 - Часовой пояс сервера — UTC (приложение само считает время фирмы `Asia/Almaty`).

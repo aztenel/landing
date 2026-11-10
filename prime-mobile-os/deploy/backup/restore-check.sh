@@ -2,7 +2,7 @@
 # Weekly restore check (architecture §6): the latest copy is restored into the STAGING database, then the ledger
 # check runs there (journals = balances) and the counts are compared. A copy that cannot be restored is not a copy.
 set -euo pipefail
-source /etc/prime/backup.env
+set -a; source /etc/prime/backup.env; set +a   # exported: pg_dump and restic read them from the environment
 STAGING_DB=${STAGING_DB:-prime_staging}
 STATUS=/var/www/prime/shared/storage/app/backup-status.json
 WORK=$(mktemp -d)
