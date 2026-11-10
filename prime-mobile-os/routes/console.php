@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Transactional outbox (audit №5): deliver changes to the site and other listeners every minute
 Schedule::command('prime:outbox')->everyMinute()->withoutOverlapping();
+
+// Nightly ledger checks in production (audit №16, TZ 02 §13)
+Schedule::command('prime:reconcile')->dailyAt('03:30')->timezone('Asia/Almaty')->withoutOverlapping();

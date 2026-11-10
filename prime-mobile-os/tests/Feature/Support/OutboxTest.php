@@ -66,3 +66,17 @@ it('delivers pending events in order, retries a failing listener later and does 
         ->and($seen)->toBe(['document.posted'])
         ->and(DB::table('outbox_events')->whereNull('processed_at')->count())->toBe(0);
 });
+
+it('runs the nightly ledger checks in production and stores the result (audit №16)', function () {
+    $w = world();
+    SaleDraft::make($w->store, $w->seller)->unit($w->phone(), Money::kzt(500000))->cash(Money::kzt(500000))->post($w->owner);
+
+    $this->artisan('prime:reconcile', ['--organization' => $w->org->id])->assertSuccessful();
+    $run = DB::table('reconciliation_runs')->where('organization_id', $w->org->id)->latest('id')->first();
+    expect($run->ok)->toBeTrue()->and($run->problem_count)->toBe(0);
+
+    // a broken balance copy is reported
+    DB::table('account_balances')->where('organization_id', $w->org->id)->limit(1)->update(['balance' => DB::raw('balance + 100')]);
+    $this->artisan('prime:reconcile', ['--organization' => $w->org->id])->assertFailed();
+    expect(DB::table('reconciliation_runs')->where('organization_id', $w->org->id)->latest('id')->value('ok'))->toBeFalse();
+});
