@@ -18,6 +18,12 @@ const TZ_TRANSITIONS = [
     ['in_stock', 'written_off'], ['preparing', 'written_off'], ['defective', 'written_off'],
     ['in_stock', 'returned_to_supplier'], ['on_check', 'returned_to_supplier'], ['defective', 'returned_to_supplier'],
     ['defective', 'preparing'],
+    // audit decisions А6 (docs/audit/decisions.md)
+    ['—', 'on_check'], ['—', 'defective'],
+    ['written_off', 'in_stock'], ['written_off', 'preparing'],
+    ['in_transit', 'written_off'], ['on_check', 'written_off'],
+    ['preparing', 'defective'], ['preparing', 'returned_to_supplier'],
+    ['returned_to_supplier', 'in_stock'], ['returned_to_supplier', 'preparing'],
 ];
 
 it('contains exactly the transitions of TZ 02 §10.3', function () {
@@ -52,7 +58,7 @@ it('throws on transitions not in the table', function (?UnitStatus $from, UnitSt
     'sold twice' => [UnitStatus::Sold, UnitStatus::Sold, UnitAction::Sell],
     'sell in transit' => [UnitStatus::InTransit, UnitStatus::Sold, UnitAction::Sell],
     'sell preparing' => [UnitStatus::Preparing, UnitStatus::Sold, UnitAction::Sell],
-    'revive written off' => [UnitStatus::WrittenOff, UnitStatus::InStock, UnitAction::Receive],
+    'revive written off by a purchase' => [UnitStatus::WrittenOff, UnitStatus::InStock, UnitAction::Receive],
     'reserve sold' => [UnitStatus::Sold, UnitStatus::Reserved, UnitAction::Reserve],
 ]);
 

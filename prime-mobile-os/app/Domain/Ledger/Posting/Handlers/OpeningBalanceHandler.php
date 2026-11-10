@@ -69,8 +69,8 @@ class OpeningBalanceHandler extends AbstractDocumentHandler
         }
         foreach ($lines as $line) {
             match ($line->line_type) {
-                'unit' => in_array($line->status_after ?? 'in_stock', ['in_stock', 'preparing'], true)
-                    ?: throw PostingException::because('bad_status', 'Входящий остаток телефона: «В наличии» или «На подготовке»'),
+                'unit' => in_array($line->status_after ?? 'in_stock', ['in_stock', 'preparing', 'on_check', 'defective'], true)
+                    ?: throw PostingException::because('bad_status', 'Входящий остаток телефона: «В наличии», «На подготовке», «На проверке» или «Брак»'),
                 'accessory' => ($line->accessory_id && $line->qty > 0 && $line->unit_cost_kzt !== null && $line->unit_cost_kzt >= 0)
                     ?: throw PostingException::because('bad_line', 'Аксессуар: товар, количество > 0 и себестоимость'),
                 'money' => ($line->account_id && (int) $line->amount !== 0)
@@ -119,7 +119,7 @@ class OpeningBalanceHandler extends AbstractDocumentHandler
                     [$cost, $orig] = $this->unitCost($ctx, $line);
                     $unit = $this->intake->create($ctx, $line, $line->supplier_id ? (int) $line->supplier_id : null);
                     $status = UnitStatus::from($line->status_after ?? 'in_stock');
-                    $action = $status === UnitStatus::Preparing ? UnitAction::ReceiveUsed : UnitAction::Receive;
+                    $action = UnitAction::OpeningBalance;
                     $this->inventory->unitIn($ctx, $unit, $store, MovementKind::Opening, $action, $status, $cost, $orig);
                     if ($line->cost_unknown) {
                         $unit->forceFill(['cost_unknown' => true])->save();

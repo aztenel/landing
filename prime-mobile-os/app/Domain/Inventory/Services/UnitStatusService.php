@@ -49,7 +49,7 @@ class UnitStatusService
      */
     public const WITHOUT_JOURNAL = [
         UnitAction::MarkReady, UnitAction::SendToPreparation, UnitAction::CheckDecision, UnitAction::ToRepair,
-        UnitAction::Order, UnitAction::CancelOrder,
+        UnitAction::Order, UnitAction::CancelOrder, UnitAction::MarkDefective,
     ];
 
     /** Generic entry point for modules (orders: in_stock ⇄ ordered). */

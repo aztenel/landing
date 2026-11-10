@@ -24,5 +24,10 @@ enum UnitAction: string
     case WriteOff = 'write_off';                    // Списание, Недостача
     case SupplierReturn = 'supplier_return';        // Возврат поставщику
     case ToRepair = 'to_repair';                    // «В ремонт»
+    case OpeningBalance = 'opening_balance';        // Входящие остатки дня X (audit №3: also on_check, defective)
+    case LegacyReturn = 'legacy_return';            // Возврат по продаже до перехода ВДП (audit №3)
+    case SurplusKnown = 'surplus_known';            // Ревизия: найден после списания (audit №41)
+    case ReceiveKnown = 'receive_known';            // Приход того же экземпляра, вернувшегося от поставщика (audit №41)
+    case MarkDefective = 'mark_defective';          // «Брак на подготовке» (кнопка, без журнала; audit №41)
     case Reversal = 'reversal';                     // Сторно документа, который сделал переход
 }

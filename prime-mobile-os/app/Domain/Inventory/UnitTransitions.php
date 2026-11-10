@@ -36,6 +36,14 @@ final class UnitTransitions
         [['in_stock', 'preparing', 'defective'], ['written_off'], UnitAction::WriteOff, 'Списание, Недостача'],
         [['in_stock', 'on_check', 'defective'], ['returned_to_supplier'], UnitAction::SupplierReturn, 'Возврат поставщику'],
         [['defective'], ['preparing'], UnitAction::ToRepair, '«В ремонт»'],
+        // added by the audit (docs/audit/decisions.md, А6 / №3, №41)
+        [[null], ['in_stock', 'preparing', 'on_check', 'defective'], UnitAction::OpeningBalance, 'Входящие остатки дня X'],
+        [[null], ['in_stock', 'preparing', 'on_check', 'defective'], UnitAction::LegacyReturn, 'Возврат по продаже до перехода (ВДП)'],
+        [['written_off'], ['in_stock', 'preparing'], UnitAction::SurplusKnown, 'Ревизия: найден после списания'],
+        [['in_transit', 'on_check'], ['written_off'], UnitAction::WriteOff, 'Списание: потерян в пути, недостача на проверке'],
+        [['preparing'], ['defective'], UnitAction::MarkDefective, '«Брак на подготовке» (кнопка, без журнала)'],
+        [['preparing'], ['returned_to_supplier'], UnitAction::SupplierReturn, 'Возврат поставщику с подготовки'],
+        [['returned_to_supplier'], ['in_stock', 'preparing'], UnitAction::ReceiveKnown, 'Приход того же экземпляра от поставщика'],
         // «любой → предыдущий: Сторно документа, который сделал переход» — see assertReversal()
     ];
 
