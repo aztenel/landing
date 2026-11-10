@@ -11,7 +11,7 @@
 <div class="space-y-4">
     <a href="{{ \App\Filament\Stock\Pages\Phones::getUrl() }}" class="inline-flex items-center gap-1 text-sm text-muted-foreground"><x-ui::icon name="chev-left" class="h-4 w-4" /> {{ __('Склад') }}</a>
 
-    <div class="grid gap-4 desk:grid-cols-[280px_minmax(0,1fr)]">
+    <div class="grid grid-cols-[minmax(0,1fr)] gap-4 desk:grid-cols-[280px_minmax(0,1fr)]">
         <div class="flex aspect-square items-center justify-center rounded-2xl bg-muted desk:aspect-auto desk:h-72">
             <x-ui::icon name="phone" class="h-16 w-16 text-muted-foreground" />
         </div>

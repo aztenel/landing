@@ -10,8 +10,8 @@
     <div class="flex flex-wrap items-center gap-2">
         <h1 class="mr-auto text-2xl font-semibold tracking-tight">{{ __('Склад') }}</h1>
         <a href="{{ $exportUrl }}" class="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted"><x-ui::icon name="download" class="h-4 w-4" /> Excel</a>
-        @if ($canReceive && \Illuminate\Support\Facades\Route::has('erp.intake.create'))
-            <a href="{{ route('erp.intake.create') }}" class="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white"><x-ui::icon name="plus" class="h-4 w-4" /> {{ __('Приход') }}</a>
+        @if ($canReceive)
+            <a href="{{ \App\Filament\Intake\Pages\NewIntake::getUrl() }}" class="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white"><x-ui::icon name="plus" class="h-4 w-4" /> {{ __('Приход') }}</a>
         @endif
     </div>
 

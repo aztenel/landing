@@ -3,7 +3,7 @@
     $input = 'mt-1 w-full rounded-lg border-input bg-background text-base';
     $fmt = fn ($b) => \App\Support\Money\Money::of(abs((int) $b->balance), $b->currency)->format();
 @endphp
-<div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
     <div class="space-y-3">
         <div class="flex flex-wrap items-center gap-2">
             <input type="search" wire:model.live.debounce.300ms="q" placeholder="{{ __('Название') }}" class="h-10 min-w-[200px] flex-1 rounded-lg border-border bg-card text-base md:max-w-sm md:text-sm">

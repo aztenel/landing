@@ -10,7 +10,7 @@
     <input type="search" wire:model.live.debounce.300ms="q" placeholder="{{ __('Поиск') }}" class="h-10 w-full max-w-sm rounded-lg border-border bg-card text-base md:text-sm">
 
     @if ($tabName === 'models')
-        <div class="grid gap-4 desk:grid-cols-[320px_minmax(0,1fr)]">
+        <div class="grid grid-cols-[minmax(0,1fr)] gap-4 desk:grid-cols-[320px_minmax(0,1fr)]">
             <div class="max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-card p-2 text-sm">
                 @foreach ($types as $type)
                     <div class="px-2 pt-2 text-xs font-medium uppercase text-muted-foreground">{{ $type->name_ru }}</div>

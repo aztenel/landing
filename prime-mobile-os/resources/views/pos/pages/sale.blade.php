@@ -13,7 +13,7 @@
      x-on:pm-scan.window="auto ? PM.autoAdd(() => $wire.scan($event.detail.code)) : $wire.scan($event.detail.code)"
      x-on:pm-catalog.window="$wire.set('catalog', $event.detail.value)"
      x-on:pm-focus-scan.window="$nextTick(() => document.getElementById('pos-scan')?.focus())"
-     x-on:pm-sale-done.window="if ($refs.printReceipt?.checked) window.open($event.detail.url, 'pm-receipt', 'width=420,height=720')">
+     x-on:pm-sale-done.window="$refs.printReceipt?.checked && window.open($event.detail.url, 'pm-receipt', 'width=420,height=720')">
 
     <div class="grid grid-cols-[minmax(0,1fr)] gap-4 desk:grid-cols-[minmax(0,1fr)_420px]">
         {{-- ======================================================== middle: scan + tiles --}}
