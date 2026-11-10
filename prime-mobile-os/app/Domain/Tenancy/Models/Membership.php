@@ -34,8 +34,15 @@ class Membership extends Model
         return [
             'status' => MembershipStatus::class,
             'limits' => 'array',
+            'payroll' => 'array',
             'started_on' => 'date',
             'dismissed_at' => 'datetime',
+            'blocked_at' => 'datetime',
+            'invited_at' => 'datetime',
+            'accepted_at' => 'datetime',
+            'rules_accepted_at' => 'datetime',
+            'last_login_at' => 'datetime',
+            'hints_seen' => 'boolean',
         ];
     }
 
