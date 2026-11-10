@@ -145,7 +145,18 @@ class SaleHandler extends AbstractDocumentHandler
             // the trade-in offset is accepted only together with the trade-in act of the same operation (audit №6, №40);
             // until the trade-in module plugs in, the method is closed
             if ($method === PaymentMethodCode::TradeIn) {
-                throw PostingException::because('tradein_without_act', 'Зачёт trade-in принимается только вместе с актом trade-in');
+                // only with the act posted in the same operation, for exactly its part «в зачёт» (audit №40)
+                $act = $p->tradein_document_id ? \App\Domain\TradeIn\Models\TradeInAct::query()->where('document_id', $p->tradein_document_id)->first() : null;
+                $actDoc = $act ? Document::query()->find($p->tradein_document_id) : null;
+                $usedElsewhere = $act && SalePayment::query()->where('tradein_document_id', $p->tradein_document_id)->where('document_id', '<>', $document->id)
+                    ->whereIn('document_id', Document::query()->where('status', DocumentStatus::Posted->value)->select('id'))->exists();
+                if (! $act || $actDoc?->status !== DocumentStatus::Posted || $usedElsewhere) {
+                    throw PostingException::because('tradein_without_act', 'Зачёт trade-in принимается только вместе с актом trade-in');
+                }
+                if ((int) $act->offset_amount !== (int) $p->amount) {
+                    throw PostingException::because('tradein_mismatch', 'Зачёт trade-in должен быть ровно '.Money::kztMinor((int) $act->offset_amount)->format());
+                }
+                $p->forceFill(['account_id' => MoneyAccount::byCode(MoneyAccount::CODE_TRADEIN_OFFSET)->id])->save();
             }
             if ($method === PaymentMethodCode::ExchangeOffset) {
                 // only in the pair «return + new sale» posted as one operation, the return first (audit №34)

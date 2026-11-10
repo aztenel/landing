@@ -39,6 +39,8 @@ class LedgerServiceProvider extends ServiceProvider
         'bonus_manual' => \App\Domain\Loyalty\Posting\BonusManualHandler::class,
         'bonus_expire' => \App\Domain\Loyalty\Posting\BonusExpireHandler::class,
         'order' => \App\Domain\Orders\Posting\OrderHandler::class,
+        'tradein' => \App\Domain\TradeIn\Posting\TradeInHandler::class,
+        'prep_cost' => \App\Domain\TradeIn\Posting\PrepCostHandler::class,
         'sale' => SaleHandler::class,
         'customer_return' => CustomerReturnHandler::class,
         'expense' => ExpenseHandler::class,

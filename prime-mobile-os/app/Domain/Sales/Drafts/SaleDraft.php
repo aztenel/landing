@@ -145,6 +145,12 @@ final class SaleDraft extends DraftBuilder
         return $this->pay(PaymentMethodCode::Debt, $amount, ['due_date' => $dueDate]);
     }
 
+    /** The part «в зачёт» of a trade-in act posted in the same operation (audit №40). */
+    public function tradeIn(Document|int $act, Money $amount): self
+    {
+        return $this->pay(PaymentMethodCode::TradeIn, $amount, ['tradein_document_id' => $act instanceof Document ? $act->id : $act]);
+    }
+
     public function bonus(Money $amount): self
     {
         return $this->pay(PaymentMethodCode::Bonus, $amount);
@@ -179,6 +185,7 @@ final class SaleDraft extends DraftBuilder
                 'commission_percent' => $p['commission_percent'] ?? ($setup?->commission_percent ?? '0.00'),
                 'tendered' => isset($p['tendered']) ? self::kzt($p['tendered']) : null,
                 'debt_due_date' => isset($p['due_date']) ? $p['due_date']->format('Y-m-d') : null,
+                'tradein_document_id' => $p['tradein_document_id'] ?? null,
             ]);
         }
     }
