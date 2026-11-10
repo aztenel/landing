@@ -2,6 +2,7 @@
 
 namespace App\Domain\Debts\Posting;
 
+use App\Domain\Money\Models\PaymentMethod;
 use App\Domain\Counterparties\Enums\CounterpartyType;
 use App\Domain\Debts\Models\DebtPayment;
 use App\Domain\Ledger\Enums\DebtKind;
@@ -105,7 +106,12 @@ class DebtPaymentHandler extends AbstractDocumentHandler
         if ($this->isIncoming()) {
             $ctx->authorize('debt.customer_pay');
             $this->money->record($ctx, $account->id, (int) $p->amount, ArticleCode::DebtIn, $attrs);
-            $commission = Money::kztMinor((int) $p->amount)->percent((string) $p->commission_percent, Rounding::HalfUp, Money::TENGE)->amount;
+            // bank commission from the firm settings of the payment method of this account, not from the request (audit №6, №22)
+            $percent = (string) (PaymentMethod::query()->where('account_id', $account->id)->where('is_enabled', true)
+                ->where(fn ($q) => $q->whereNull('store_id')->orWhere('store_id', $document->store_id))
+                ->orderByRaw('store_id IS NULL')->value('commission_percent') ?? '0.00');
+            $p->forceFill(['commission_percent' => $percent])->save();
+            $commission = Money::kztMinor((int) $p->amount)->percent($percent, Rounding::HalfUp, Money::TENGE)->amount;
             if ($commission > 0) {
                 $this->money->record($ctx, $account->id, -$commission, ArticleCode::BankFee, $attrs);
             }
@@ -117,9 +123,11 @@ class DebtPaymentHandler extends AbstractDocumentHandler
 
         $ctx->authorize('debt.supplier', message: 'Оплату поставщику проводит админ или владелец');
         $moneyEntry = $this->money->record($ctx, $account->id, -(int) $p->amount, ArticleCode::SupplierPayment, $attrs);
-        $debtAmount = $p->debt_amount ?? ($account->currency === $debtCurrency
+        // the settled debt is computed, never taken from the request (audit №22): same currency — the payment itself,
+        // otherwise the payment converted at the document rate
+        $debtAmount = $account->currency === $debtCurrency
             ? (int) $p->amount
-            : Money::of((int) $p->amount, $account->currency)->convert($debtCurrency, $ctx->requireRate())->amount);
+            : Money::of((int) $p->amount, $account->currency)->convert($debtCurrency, $ctx->requireRate())->amount;
         $debtEntry = $this->debts->record(
             $ctx, $type, (int) $p->counterparty_id, $debtCurrency, $debtAmount, DebtKind::PaymentOut,
             settledKzt: -(int) $moneyEntry->amount_kzt,

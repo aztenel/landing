@@ -80,7 +80,9 @@ it('accepts a customer debt payment with a bank commission', function () {
     $w = world();
     OpeningBalanceDraft::make($w->store)->customerDebt($w->customer, Money::kzt(100000), now()->addDays(5))->post($w->owner);
 
-    DebtPaymentDraft::fromCustomer($w->customer, $w->account('kaspi_qr'), Money::kzt(40000), $w->store, '1.00')->post($w->seller);
+    // the commission comes from the payment method of the account (1 %), the value in the request is ignored (audit №22)
+    \App\Domain\Money\Models\PaymentMethod::query()->where('code', 'kaspi_qr')->update(['commission_percent' => '1.00']);
+    DebtPaymentDraft::fromCustomer($w->customer, $w->account('kaspi_qr'), Money::kzt(40000), $w->store, '0.00')->post($w->seller);
 
     expect((int) $w->debt(CounterpartyType::Customer->value, $w->customer->id)->balance)->toBe(Money::kzt(60000)->amount)
         ->and($w->balance('kaspi_qr'))->toBe(Money::kzt(39600)->amount);
