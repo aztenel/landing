@@ -52,7 +52,7 @@ class Shifts extends Report
         $rows = $shifts->map(fn ($sh) => ['number' => $sh->number, 'opened' => Carbon::parse($sh->opened_at)->setTimezone($tz)->format('d.m H:i'), 'by' => $names[$sh->opened_by] ?? '',
             'closed' => $sh->closed_at ? Carbon::parse($sh->closed_at)->setTimezone($tz)->format('d.m H:i') : __('открыта'),
             'open_diff' => (int) (($diffs[$sh->id] ?? collect())->firstWhere('phase', 'open')->d ?? 0), 'close_diff' => (int) (($diffs[$sh->id] ?? collect())->firstWhere('phase', 'close')->d ?? 0),
-            '_class' => (($diffs[$sh->id] ?? collect())->sum('d') != 0) ? 'text-warn' : ''])->values();
+            '_url' => route('erp.print.shift', $sh->id), '_class' => (($diffs[$sh->id] ?? collect())->sum('d') != 0) ? 'text-warn' : ''])->values();
 
         return [
             'tiles' => [self::tile(__('Смен'), $rows->count(), 'int'), self::tile(__('С расхождением'), $rows->filter(fn ($r) => $r['open_diff'] || $r['close_diff'])->count(), 'int'),

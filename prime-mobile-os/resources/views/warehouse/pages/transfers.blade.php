@@ -7,7 +7,7 @@
         @include('warehouse.partials.goods')
         <div class="flex justify-end"><button type="button" wire:click="send" class="h-11 rounded-lg bg-primary px-6 text-sm font-semibold text-white">{{ __('Отправить') }}</button></div>
         <h3 class="pt-2 text-sm font-semibold">{{ __('Исходящие') }}</h3>
-        @foreach ($outgoing as $d)<div class="num flex justify-between border-b border-border py-1.5 text-xs"><span>{{ $d->number }} → {{ $storeNames[$ops[$d->id]?->to_store_id] ?? '' }}</span><span>{{ ['in_transit' => __('в пути'), 'received' => __('принято')][$ops[$d->id]?->status] ?? '' }}{{ $d->status->value === 'reversed' ? ' · '.__('сторно') : '' }}</span></div>@endforeach
+        @foreach ($outgoing as $d)<div class="num flex justify-between border-b border-border py-1.5 text-xs"><span>{{ $d->number }} → {{ $storeNames[$ops[$d->id]?->to_store_id] ?? '' }} <a href="{{ route('erp.print.invoice', $d) }}" target="_blank" class="text-primary">{{ __('накладная') }}</a></span><span>{{ ['in_transit' => __('в пути'), 'received' => __('принято')][$ops[$d->id]?->status] ?? '' }}{{ $d->status->value === 'reversed' ? ' · '.__('сторно') : '' }}</span></div>@endforeach
     </section>
     <section class="space-y-3 rounded-xl border border-border bg-card p-4">
         <h2 class="font-semibold">{{ __('Входящие') }} · {{ $incoming->count() }}</h2>

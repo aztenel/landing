@@ -61,7 +61,11 @@
                     <div class="flex gap-2"><input type="text" wire:model="fiscal" placeholder="{{ __('№ фискального чека') }}" class="h-9 min-w-0 flex-1 rounded-lg border-input bg-background text-sm"><button type="button" wire:click="saveFiscal" class="h-9 rounded-lg border border-border px-3 text-xs">{{ __('Сохранить') }}</button></div>
                 @endif
                 <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('erp.pos.receipt', $open) }}" target="_blank" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Печать') }}</a>
+                    <a href="{{ route('erp.print.sale', $open) }}" target="_blank" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Чек') }}</a>
+                    @if ($open->type->value === 'sale')
+                        <a href="{{ route('erp.print.warranty', $open) }}" target="_blank" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs"><x-ui::icon name="shield" class="h-4 w-4" /> {{ __('Гарантия') }}</a>
+                        @if (\App\Domain\Sales\Models\SalePayment::query()->where('document_id', $open->id)->where('method', 'debt')->exists())<a href="{{ route('erp.print.debt', $open) }}" target="_blank" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs">{{ __('Расписка о долге') }}</a>@endif
+                    @endif
                     @if ($canReturn && $open->status->value === 'posted')<a href="{{ \App\Filament\Sales\Pages\Returns::getUrl(['sale' => $open->id]) }}" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs"><x-ui::icon name="repeat" class="h-4 w-4" /> {{ __('Возврат') }}</a>@endif
                     @if ($canReverse && $open->status->value === 'posted')<button type="button" wire:click="$set('reverseOpen', true)" class="inline-flex h-9 items-center rounded-lg px-3 text-xs text-bad hover:bg-bad/10">{{ __('Сторно') }}</button>@endif
                 </div>

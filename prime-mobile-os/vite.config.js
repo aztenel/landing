@@ -7,6 +7,7 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/css/storefront.css',
+                'resources/css/print.css',
                 'resources/css/filament/admin/theme.css',
                 'resources/js/app.js',
                 'resources/js/erp.js',

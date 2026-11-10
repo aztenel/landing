@@ -79,7 +79,10 @@
                 @if ($status === 'sold')<a href="{{ \App\Filament\Warehouse\Pages\WarrantyCases::getUrl(['unit' => $unit->id]) }}" class="{{ $btn }}"><x-ui::icon name="shield" class="h-4 w-4" /> {{ __('Гарантийное обращение') }}</a>@endif
                 @if (! \App\Support\Ui\Access::instance()->decision('stock.unit_edit')->isDenied())<button type="button" wire:click="$set('modal', 'edit')" class="{{ $btn }}">{{ __('Исправить карточку') }}</button>@endif
                 @if (\App\Support\Ui\Access::allows('stock.cost_adjust') && ! in_array($status, ['sold', 'written_off', 'returned_to_supplier']))<button type="button" wire:click="$set('modal', 'cost')" class="{{ $btn }}">{{ __('Корректировать себестоимость') }}</button>@endif
-                <button type="button" disabled class="{{ $btn }} opacity-50" title="{{ __('Печать подключается с модулем печати') }}"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Этикетка') }}</button>
+                @if (\App\Support\Ui\Access::allows('label.print'))
+                    <a href="{{ route('erp.print.labels', ['units' => $unit->id]) }}" target="_blank" class="{{ $btn }}"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Этикетка') }}</a>
+                    <a href="{{ route('erp.print.price_tags', ['units' => $unit->id]) }}" target="_blank" class="{{ $btn }}"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Ценник') }}</a>
+                @endif
             </div>
             @if ($error)<p class="text-sm text-bad" role="alert">{{ $error }}</p>@elseif ($flash)<p class="text-sm text-ok" role="status">{{ $flash }}</p>@endif
         </div>

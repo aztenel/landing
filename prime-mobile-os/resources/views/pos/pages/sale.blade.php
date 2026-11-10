@@ -396,7 +396,8 @@
                         @php($lastCash = \App\Domain\Sales\Models\SalePayment::query()->where('document_id', $done->id)->where('method', 'cash')->value('change'))
                         @if ($lastCash)<div class="num mt-3 text-3xl font-bold">{{ __('Сдача') }} {{ $money((int) $lastCash) }}</div>@endif
                         <div class="mt-5 flex justify-center gap-2">
-                            <a href="{{ route('erp.pos.receipt', $done) }}" target="_blank" class="{{ $btn }}"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Печать') }}</a>
+                            <a href="{{ route('erp.print.sale', $done) }}" target="_blank" class="{{ $btn }}"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Чек') }}</a>
+                            @if (\App\Domain\Sales\Models\SaleLine::query()->where('document_id', $done->id)->whereNotNull('stock_unit_id')->exists())<a href="{{ route('erp.print.warranty', $done) }}" target="_blank" class="{{ $btn }}"><x-ui::icon name="shield" class="h-4 w-4" /> {{ __('Гарантия') }}</a>@endif
                             <button type="button" wire:click="newCheck" autofocus class="h-10 rounded-lg bg-primary px-6 text-sm font-semibold text-white">{{ __('Новый чек') }} <span class="hidden desk:inline"><x-ui::kbd>Enter</x-ui::kbd></span></button>
                         </div>
                     </div>

@@ -57,7 +57,10 @@
         @if ($selected)
             <div class="flex flex-wrap items-center gap-4 bg-primary px-4 py-3 text-sm font-medium text-white">
                 <span>{{ __('Выбрано :n', ['n' => count($selected)]) }}</span>
-                <button type="button" disabled class="flex items-center gap-1.5 opacity-60" title="{{ __('Печать этикеток подключается с модулем печати') }}"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Этикетка') }}</button>
+                @if (\App\Support\Ui\Access::allows('label.print'))
+                    <a href="{{ route('erp.print.labels', ['units' => implode(',', $selected)]) }}" target="_blank" class="flex items-center gap-1.5"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Этикетки') }}</a>
+                    <a href="{{ route('erp.print.price_tags', ['units' => implode(',', $selected)]) }}" target="_blank" class="flex items-center gap-1.5"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Ценники') }}</a>
+                @endif
                 @if ($canImei)<button type="button" wire:click="markImei" wire:confirm="{{ __('Вы проверили эти IMEI в госбазе? Отметка ставится от вашего имени') }}" class="flex items-center gap-1.5"><x-ui::icon name="shield" class="h-4 w-4" /> {{ __('Отметить госбазу') }}</button>@endif
                 @if ($canPrice)<button type="button" wire:click="$set('modal', 'price')" class="flex items-center gap-1.5"><x-ui::icon name="pencil" class="h-4 w-4" /> {{ __('Сменить цену') }}</button>@endif
                 <button type="button" wire:click="$set('selected', [])" class="ml-auto opacity-80">{{ __('Снять выбор') }}</button>

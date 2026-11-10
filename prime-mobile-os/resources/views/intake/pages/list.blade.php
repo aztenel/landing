@@ -20,7 +20,11 @@
                 @forelse ($docs as $d)
                     @php($p = $purchases[$d->id] ?? null)
                     <tr class="border-b border-border last:border-0" wire:key="d{{ $d->id }}">
-                        <td class="num px-4 py-3">{{ $d->number ?? __('черновик') }} @if ($d->status->value === 'reversed')<span class="ml-1 rounded-full bg-muted px-2 text-xs">{{ __('сторно') }}</span>@endif</td>
+                        <td class="num px-4 py-3">{{ $d->number ?? __('черновик') }}
+                            @if ($d->status->value === 'posted')
+                                <span class="ml-1 inline-flex gap-2 text-xs"><a href="{{ route('erp.print.invoice', $d) }}" target="_blank" class="text-primary">{{ __('накладная') }}</a>
+                                @if (\App\Support\Ui\Access::allows('label.print'))<a href="{{ route('erp.print.labels', ['doc' => $d->id]) }}" target="_blank" class="text-primary">{{ __('этикетки') }}</a>@endif</span>
+                            @endif @if ($d->status->value === 'reversed')<span class="ml-1 rounded-full bg-muted px-2 text-xs">{{ __('сторно') }}</span>@endif</td>
                         <td class="num px-2 py-3 text-muted-foreground">{{ ($d->posted_at ?? $d->created_at)?->setTimezone(\App\Support\Tenancy\CurrentOrganization::instance()->require()->timezone)->format('d.m.Y H:i') }}</td>
                         @if ($canSupplier)<td class="px-2 py-3">{{ $suppliers[$p?->supplier_id] ?? '—' }}</td>@endif
                         <td class="num px-2 py-3 text-right">{{ (int) ($lines[$d->id]->units ?? 0) }} / {{ (int) ($lines[$d->id]->acc ?? 0) }}</td>

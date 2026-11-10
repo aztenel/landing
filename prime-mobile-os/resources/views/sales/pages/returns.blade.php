@@ -127,7 +127,8 @@
         <section class="rounded-2xl border border-border bg-card p-6 text-center">
             <x-ui::icon name="check" class="mx-auto h-12 w-12 text-ok" />
             <h2 class="mt-2 text-xl font-semibold">{{ __('Возврат :n проведён', ['n' => $done->number]) }}</h2>
-            <p class="mt-1 text-sm text-muted-foreground">{{ __('Распечатайте акт возврата и дайте клиенту подписать (бланк — с модулем печати).') }}</p>
+            <p class="mt-1 text-sm text-muted-foreground">{{ __('Распечатайте чек возврата в двух экземплярах и дайте клиенту подписать.') }}</p>
+            <a href="{{ route('erp.print.return', $done) }}" target="_blank" class="mt-4 inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium"><x-ui::icon name="printer" class="h-4 w-4" />{{ __('Чек возврата') }}</a>
             <button type="button" wire:click="restart" class="mt-4 h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-white">{{ __('Новый возврат') }}</button>
         </section>
     @endif

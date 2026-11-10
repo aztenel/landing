@@ -1,9 +1,11 @@
 <?php
 
-use App\Domain\Catalog\Models\AccessoryPrice;
+use App\Domain\Approvals\Models\ApprovalRequest;
+use App\Domain\Approvals\Services\ApprovalService;
 use App\Domain\Inventory\Enums\UnitStatus;
 use App\Domain\Ledger\Models\Document;
 use App\Domain\Ledger\Services\Shifts;
+use App\Domain\Money\Services\ShiftCash;
 use App\Filament\Pos\Pages\Sale;
 use App\Support\Money\Money;
 use Filament\Facades\Filament;
@@ -26,9 +28,9 @@ it('sells from the page: scan, quick cash, F9, «Провести»; the receipt
 
     $doc = Document::query()->where('type', 'sale')->where('status', 'posted')->firstOrFail();
     expect($unit->refresh()->status)->toBe(UnitStatus::Sold);
-    $this->get(route('erp.pos.receipt', $doc))->assertOk()->assertSee($doc->number)->assertSee('549');
+    $this->followingRedirects()->get(route('erp.pos.receipt', $doc))->assertOk()->assertSee($doc->number)->assertSee('549');
 
-    $this->actingAs($w->accountant)->get(route('erp.pos.receipt', $doc))->assertForbidden();
+    $this->actingAs($w->accountant)->followingRedirects()->get(route('erp.pos.receipt', $doc))->assertForbidden();
 });
 
 it('does not take the price from the browser and shows the core errors as they are', function () {
@@ -50,7 +52,7 @@ it('asks to open the shift with a cash count when it is closed (Э3.6)', functio
     $this->actingAs($w->seller);
 
     $page = Livewire::test(Sale::class)->assertSet('modal', 'shift-open')->assertSee('Открыть смену');
-    $counted = collect(app(\App\Domain\Money\Services\ShiftCash::class)->registers($w->store))->mapWithKeys(fn ($a) => [$a->id => '0'])->all();
+    $counted = collect(app(ShiftCash::class)->registers($w->store))->mapWithKeys(fn ($a) => [$a->id => '0'])->all();
     $page->set('counted', $counted)->call('doOpenShift')->assertSet('error', null)->assertSet('modal', null);
     expect(app(Shifts::class)->current($w->store))->not->toBeNull();
 });
@@ -65,8 +67,8 @@ it('sends an over-limit discount request from the page and posts after the owner
         ->call('quickPay', 'cash')->call('f9')->call('pay')->assertSet('modal', 'approval')
         ->call('requestApproval')->assertSee('Ждём ответа');
 
-    $request = \App\Domain\Approvals\Models\ApprovalRequest::query()->latest('id')->first();
-    app(\App\Domain\Approvals\Services\ApprovalService::class)->approve($request, $w->owner);
+    $request = ApprovalRequest::query()->latest('id')->first();
+    app(ApprovalService::class)->approve($request, $w->owner);
     $page->call('pollApproval')->assertSet('modal', 'done');
     expect($unit->refresh()->status)->toBe(UnitStatus::Sold);
 });

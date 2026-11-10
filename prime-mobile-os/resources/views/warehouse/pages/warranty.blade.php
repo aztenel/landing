@@ -15,6 +15,7 @@
             <div class="rounded-xl border border-border bg-card px-4 py-3 text-sm" wire:key="c{{ $c->id }}">
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="num font-semibold">{{ $c->number }}</span><span>{{ $u?->variant?->title() }}</span><span class="num text-xs text-muted-foreground">{{ $u?->public_code }}</span>
+                    <a href="{{ route('erp.print.warranty_case', $c->id) }}" target="_blank" class="text-xs text-primary">{{ __('квитанция') }}</a>
                     <span class="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs">{{ __(\App\Domain\Warehouse\Models\WarrantyCase::STATUSES[$c->status] ?? $c->status) }}</span>
                 </div>
                 <div class="mt-1 text-xs text-muted-foreground">{{ $c->complaint }}{{ $c->result ? ' → '.$c->result : '' }}</div>

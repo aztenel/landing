@@ -27,6 +27,7 @@
                     <span class="num text-xs {{ $color($b->nearest_due_date) }}">{{ $b->nearest_due_date ? __('до :d', ['d' => $b->nearest_due_date->format('d.m.Y')]) : '' }}{{ $b->nearest_due_date && $b->nearest_due_date->lt(today()) ? ' · '.__('просрочено :n дн.', ['n' => (int) $b->nearest_due_date->diffInDays(today())]) : '' }}</span>
                     <span class="num font-semibold">{{ $money($b->balance) }}</span>
                     @if ($c?->phone)<a href="https://wa.me/{{ preg_replace('/\D/', '', $c->phone) }}?text={{ rawurlencode(__('Здравствуйте, :n! Напоминаем о платеже :s в Prime Mobile.', ['n' => $c->name, 's' => $money($b->balance)]).($b->nearest_due_date ? ' '.__('Срок — :d', ['d' => $b->nearest_due_date->format('d.m.Y')]) : '')) }}" target="_blank" class="h-9 rounded-lg border border-border px-3 text-xs leading-9">{{ __('Напомнить') }}</a>@endif
+                    <a href="{{ route('erp.print.reconciliation', ['type' => 'customer', 'id' => $b->counterparty_id]) }}" target="_blank" class="inline-flex h-9 items-center rounded-lg border border-border px-3 text-xs">{{ __('Акт сверки') }}</a>
                     <button type="button" wire:click="payCustomer({{ $b->counterparty_id }})" class="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white">{{ __('Принять оплату') }}</button>
                 </div>
             @empty
@@ -38,6 +39,7 @@
                     <span class="min-w-0 flex-1 font-medium">{{ $supplierNames[$b->counterparty_id] ?? '' }}</span>
                     <span class="num text-xs {{ $color($b->nearest_due_date) }}">{{ $b->nearest_due_date ? __('до :d', ['d' => $b->nearest_due_date->format('d.m.Y')]) : '' }}</span>
                     <span class="num font-semibold">{{ $money($b->balance, $b->currency) }}</span>
+                    <a href="{{ route('erp.print.reconciliation', ['type' => 'supplier', 'id' => $b->counterparty_id]) }}" target="_blank" class="inline-flex h-9 items-center rounded-lg border border-border px-3 text-xs">{{ __('Акт сверки') }}</a>
                     @if ($canPaySupplier)<button type="button" wire:click="paySupplier({{ $b->counterparty_id }}, '{{ $b->currency }}')" class="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white">{{ __('Оплатить') }}</button>@endif
                 </div>
             @empty

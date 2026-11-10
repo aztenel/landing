@@ -26,7 +26,7 @@ final class StorefrontContext
         Site::boot($org, $request->segment(1) === 'kk' ? 'kk' : 'ru', $preview);
         app()->setLocale(Site::$lang);
 
-        if (! Site::settings()->enabled() && ! $preview && ! $request->routeIs('storefront.robots', 'storefront.preview')) {
+        if (! Site::settings()->enabled() && ! $preview && ! $request->routeIs('storefront.robots', 'storefront.preview', 'storefront.receipt')) {
             return response()->view('storefront.soon', [], 200)->header('X-Robots-Tag', 'noindex');
         }
         $response = $next($request);
