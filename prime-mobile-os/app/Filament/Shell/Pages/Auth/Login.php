@@ -73,7 +73,7 @@ class Login extends PhoneLogin
     {
         return TextInput::make('phone')
             ->label(__('Телефон'))
-            ->tel()
+            ->type('tel') // not ->tel(): its regex rejects the mask «+7 (701) …»; the number is checked in authenticate()
             ->mask('+7 (999) 999-99-99')
             ->placeholder('+7 (___) ___-__-__')
             ->required()
