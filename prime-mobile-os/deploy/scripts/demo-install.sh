@@ -25,7 +25,7 @@ warn() { printf '\033[1;33m!!  %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31mОШИБКА: %s\033[0m\n' "$*"; exit 1; }
 as_prime() { sudo -u prime -H bash -c "$*"; }
 svc() {   # svc <name>: (re)start a service and start it on boot — systemd on a VPS, «service» in a container
-    if [ -d /run/systemd/system ]; then systemctl enable "$1" >/dev/null 2>&1 || true; systemctl restart "$1"; else service "$1" restart >/dev/null; fi
+    if [ -d /run/systemd/system ]; then systemctl enable "$1" >/dev/null 2>&1 || true; systemctl restart "$1"; else service "$1" restart >/dev/null 2>&1 || service "$1" start >/dev/null 2>&1 || warn "$1: перезапуск не подтвердился"; fi
 }
 envget() { grep -E "^$1=" "$SHARED/.env" | head -1 | cut -d= -f2-; }
 
