@@ -11,6 +11,9 @@ Artisan::command('inspire', function () {
 // Transactional outbox (audit №5): deliver changes to the site and other listeners every minute
 Schedule::command('prime:outbox')->everyMinute()->withoutOverlapping();
 
+// Nightly expiry of customer bonuses, a system document БСГ per firm (audit №54); before the ledger checks
+Schedule::command('prime:bonus-expire')->dailyAt('03:10')->timezone('Asia/Almaty')->withoutOverlapping();
+
 // Nightly ledger checks in production (audit №16, TZ 02 §13)
 Schedule::command('prime:reconcile')->dailyAt('03:30')->timezone('Asia/Almaty')->withoutOverlapping();
 

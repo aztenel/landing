@@ -2,6 +2,7 @@
 
 namespace App\Domain\Sales\Posting;
 
+use App\Domain\Loyalty\Services\DebtBonusAccrual;
 use App\Domain\Counterparties\Enums\CounterpartyType;
 use App\Domain\Inventory\Enums\UnitAction;
 use App\Domain\Inventory\Enums\UnitStatus;
@@ -214,7 +215,8 @@ class CustomerReturnHandler extends AbstractDocumentHandler
                 throw PostingException::because('bad_qty', 'Возвращают больше, чем осталось в чеке (часть уже возвращена)');
             }
             $restoreBonuses += $this->calculator->bonusesToRestore($saleLine, $qty);
-            $cancelBonuses += $this->calculator->bonusesToCancel($saleLine, $qty);
+            $debtBonuses = app(DebtBonusAccrual::class)->accruedFor((int) $saleLine->id); // accrued on repayment (audit №25)
+            $cancelBonuses += $this->calculator->bonusesToCancel($saleLine, $qty, $debtBonuses);
             $creditPart += $this->calculator->creditPart($saleLine, $qty);
             if ($saleLine->stock_unit_id) {
                 $unit = $ctx->locks->unit((int) $saleLine->stock_unit_id);
@@ -236,7 +238,7 @@ class CustomerReturnHandler extends AbstractDocumentHandler
             $saleLine->forceFill(['returned_qty' => $returned, 'is_active' => $returned < (int) $saleLine->qty])->save();
             $line->forceFill(['amount' => $amount, 'cost_kzt' => $cost])->save();
 
-            if ($saleLine->bonus_accrued > 0) {
+            if ($saleLine->bonus_accrued > 0 || $debtBonuses > 0) {
                 $cancelSources[] = $saleLine->id;
             }
         }
@@ -250,7 +252,8 @@ class CustomerReturnHandler extends AbstractDocumentHandler
             }
         }
         if ($customerId && $cancelBonuses > 0) {
-            $sourceIds = BonusEntry::query()->where('document_id', $saleDoc->id)->where('is_source', true)
+            // the line's accruals of the sale itself and of the debt payments
+            $sourceIds = BonusEntry::query()->where('customer_id', $customerId)->where('is_source', true)
                 ->whereIn('sale_line_id', $cancelSources)->pluck('id')->map(fn ($id) => (int) $id)->all();
             $result = $this->bonuses->consume($ctx, $customerId, $cancelBonuses, BonusKind::CancelAccrual, $sourceIds, includePending: true, allowShortfall: true);
             $withheld = $result['shortfall'] * Money::TENGE;

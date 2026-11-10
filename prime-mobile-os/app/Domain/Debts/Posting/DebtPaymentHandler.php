@@ -2,6 +2,7 @@
 
 namespace App\Domain\Debts\Posting;
 
+use App\Domain\Loyalty\Services\DebtBonusAccrual;
 use App\Domain\Money\Models\PaymentMethod;
 use App\Domain\Counterparties\Enums\CounterpartyType;
 use App\Domain\Debts\Models\DebtPayment;
@@ -24,7 +25,7 @@ use App\Support\Money\Rounding;
  *  - debt_payment_in: the customer pays us (₸): + account, − commission for non-cash, − customer debt;
  *  - debt_payment_out: we pay a supplier from a ₸ or $ account; a $ debt is reduced in $ at the average rate and the
  *    difference with the money actually paid is the exchange difference (debt_entries.fx_diff_kzt).
- * Bonus accrual on the repaid credit part (TZ 02 №34) is left to the Loyalty module.
+ * Bonuses on the repaid credit part (TZ 02 №34, audit №25) — Loyalty\\Services\\DebtBonusAccrual.
  */
 class DebtPaymentHandler extends AbstractDocumentHandler
 {
@@ -90,9 +91,11 @@ class DebtPaymentHandler extends AbstractDocumentHandler
     {
         $p = $this->payment($document);
 
-        return (new LockPlan)
+        $plan = (new LockPlan)
             ->account((int) $p->account_id)
             ->counterparty(CounterpartyType::from($p->counterparty_type), (int) $p->counterparty_id, Currency::from($p->debt_currency));
+
+        return $this->isIncoming() ? $plan->bonus((int) $p->counterparty_id) : $plan;
     }
 
     public function post(Document $document, PostingContext $ctx): void
@@ -115,8 +118,11 @@ class DebtPaymentHandler extends AbstractDocumentHandler
             if ($commission > 0) {
                 $this->money->record($ctx, $account->id, -$commission, ArticleCode::BankFee, $attrs);
             }
+            $before = (int) $ctx->locks->counterparty($type, (int) $p->counterparty_id, Currency::KZT)->balance;
             $this->debts->record($ctx, $type, (int) $p->counterparty_id, Currency::KZT, -(int) $p->amount, DebtKind::PaymentIn);
             $p->forceFill(['debt_amount' => (int) $p->amount, 'commission_amount' => $commission])->save();
+            // bonuses on the repaid credit part of the sales (audit №25 p.4)
+            app(DebtBonusAccrual::class)->onPayment($ctx, $document, (int) $p->counterparty_id, (int) $p->amount, $before);
 
             return;
         }

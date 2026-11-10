@@ -61,6 +61,31 @@ class Poster
         return TransactionRetry::run(fn () => array_map(fn (Document $d) => $this->post($d, $actor), $documents));
     }
 
+    /** Document types that nightly jobs post on behalf of the system (audit №54). */
+    public const SYSTEM_TYPES = [DocumentType::BonusExpire];
+
+    /**
+     * Posting by a nightly job, without a person: only types of SYSTEM_TYPES, created with meta.system = true. The
+     * journals need a user: the firm's owner stands for the system (posted_by), the activity log says «system».
+     */
+    public function postAsSystem(Document $document): Document
+    {
+        if (! in_array($document->type, self::SYSTEM_TYPES, true) || ! ($document->meta['system'] ?? false)) {
+            throw PostingException::because('not_system_type', 'Этот документ система не проводит');
+        }
+        $orgId = CurrentOrganization::instance()->requireId();
+        $ownerId = DB::table('model_has_roles as mr')->join('roles as r', 'r.id', '=', 'mr.role_id')
+            ->join('memberships as m', fn ($j) => $j->on('m.user_id', '=', 'mr.model_id')->where('m.organization_id', $orgId))
+            ->where('mr.organization_id', $orgId)->where('r.is_owner', true)->where('m.status', 'active')
+            ->orderBy('mr.model_id')->value('mr.model_id');
+        $owner = $ownerId ? User::query()->find($ownerId) : null;
+        if (! $owner) {
+            throw PostingException::because('no_owner', 'В фирме нет владельца — системный документ не провести');
+        }
+
+        return $this->post($document, $owner);
+    }
+
     public function post(Document $document, User $actor): Document
     {
         $organization = CurrentOrganization::instance()->require();
@@ -118,10 +143,12 @@ class Poster
                 'approval_request_id' => $ctx->approvalUsed() ? $doc->approval_request_id : null,
             ])->save();
 
-            activity('documents')
-                ->performedOn($doc)
-                ->causedBy($actor)
-                ->withProperties(['organization_id' => $organization->id, 'type' => $doc->type->value, 'number' => $doc->number])
+            $system = (bool) ($doc->meta['system'] ?? false);
+            $log = activity('documents')->performedOn($doc);
+            if (! $system) {
+                $log->causedBy($actor);
+            }
+            $log->withProperties(['organization_id' => $organization->id, 'type' => $doc->type->value, 'number' => $doc->number] + ($system ? ['system' => true] : []))
                 ->log('posted');
 
             // reliable announcement for the site and other listeners, in this very transaction (audit №5)

@@ -60,9 +60,10 @@ class ReturnCalculator
     }
 
     /** Bonuses accrued on the line to cancel for $qty more returned pieces (cumulative rounding, Σ = accrued). */
-    public function bonusesToCancel(SaleLine $line, int $qty): int
+    /** $debtBonuses: accrued for this line later, on repayment of its credit part (audit №25). */
+    public function bonusesToCancel(SaleLine $line, int $qty, int $debtBonuses = 0): int
     {
-        return $this->cumulativeShare((int) $line->bonus_accrued, (int) $line->qty, (int) $line->returned_qty, $qty);
+        return $this->cumulativeShare((int) $line->bonus_accrued + $debtBonuses, (int) $line->qty, (int) $line->returned_qty, $qty);
     }
 
     /** Part of the returned pieces that was sold on credit, in tiyn, whole tenge (cumulative rounding, Σ = debt share). */
