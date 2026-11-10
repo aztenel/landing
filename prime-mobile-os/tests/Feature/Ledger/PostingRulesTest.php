@@ -104,14 +104,14 @@ it('allows backdating only to admins/owners, up to 3 days, with a reason', funct
 it('reports a clear error for document types whose module is not built yet', function () {
     $w = world();
     $doc = new Document;
-    $doc->forceFill(['type' => DocumentType::TransferOut->value, 'store_id' => $w->store->id, 'occurred_at' => now(), 'idempotency_key' => Idempotency::newKey()])->save();
+    $doc->forceFill(['type' => DocumentType::LegacyReturn->value, 'store_id' => $w->store->id, 'occurred_at' => now(), 'idempotency_key' => Idempotency::newKey()])->save();
 
     expect(fn () => app(Poster::class)->post($doc, $w->owner))->toThrow(NotImplementedDocumentType::class, 'ещё не реализовано');
 
     $registry = app(HandlerRegistry::class);
     expect($registry->has(DocumentType::Sale))->toBeTrue()
         ->and($registry->has(DocumentType::DebtPaymentOut))->toBeTrue()
-        ->and($registry->has(DocumentType::TransferOut))->toBeFalse();
+        ->and($registry->has(DocumentType::LegacyReturn))->toBeFalse();
 });
 
 it('takes the opening balance (day X): phones, accessories, money, debts, bonuses', function () {
