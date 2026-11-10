@@ -60,6 +60,10 @@ class LedgerServiceProvider extends ServiceProvider
                 $registry->register(DocumentType::from($type), $handler);
             }
             $registry->register(DocumentType::DebtPaymentIn, DebtPaymentHandler::incoming($app->make(MoneyLedger::class), $app->make(DebtLedger::class)));
+            foreach ([DocumentType::TransferOut, DocumentType::TransferIn, DocumentType::WriteOff, DocumentType::SupplierReturn,
+                DocumentType::Revision, DocumentType::UnitEdit, DocumentType::CostAdjustment] as $t) {
+                $registry->register($t, (\App\Domain\Warehouse\Posting\StockOpHandler::for($t))($app));
+            }
             $registry->register(DocumentType::DebtPaymentOut, DebtPaymentHandler::outgoing($app->make(MoneyLedger::class), $app->make(DebtLedger::class)));
 
             return $registry;
