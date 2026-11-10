@@ -24,15 +24,11 @@ return new class extends Migration
             $table->index(['organization_id', 'created_at']);
             $table->index(['organization_id', 'causer_id', 'created_at']);
         });
-
-        DB::unprepared('CREATE TRIGGER activity_log_append_only BEFORE UPDATE OR DELETE ON activity_log FOR EACH ROW EXECUTE FUNCTION pm_append_only()');
-        DB::unprepared('CREATE TRIGGER activity_log_no_truncate BEFORE TRUNCATE ON activity_log FOR EACH STATEMENT EXECUTE FUNCTION pm_append_only()');
+        // the «only INSERT» triggers are in the core (2026_11_09_170400_audit_small_guards, audit №14)
     }
 
     public function down(): void
     {
-        DB::unprepared('DROP TRIGGER IF EXISTS activity_log_no_truncate ON activity_log');
-        DB::unprepared('DROP TRIGGER IF EXISTS activity_log_append_only ON activity_log');
         Schema::table('activity_log', function (Blueprint $table) {
             $table->dropIndex(['organization_id', 'causer_id', 'created_at']);
             $table->dropIndex(['organization_id', 'created_at']);

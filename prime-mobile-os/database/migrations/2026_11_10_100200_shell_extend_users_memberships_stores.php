@@ -18,7 +18,6 @@ return new class extends Migration
         });
 
         Schema::table('memberships', function (Blueprint $table) {
-            $table->jsonb('store_flags')->default('{}');        // {"<store_id>": {"sales": true, "finance": true}} — «Прод»/«Фин»
             $table->jsonb('payroll')->default('{}');            // % of profit: {"phones": "5.00", "accessories": "10.00"}
             $table->text('blocked_reason')->nullable();         // visible to owner/admin only (TZ 03 §15.1)
             $table->timestampTz('blocked_at')->nullable();
@@ -46,7 +45,7 @@ return new class extends Migration
         Schema::table('stores', fn (Blueprint $table) => $table->dropColumn('meta'));
         Schema::table('roles', fn (Blueprint $table) => $table->dropColumn('description'));
         Schema::table('memberships', fn (Blueprint $table) => $table->dropColumn([
-            'store_flags', 'payroll', 'blocked_reason', 'blocked_at', 'dismissal_reason', 'invited_at', 'accepted_at',
+            'payroll', 'blocked_reason', 'blocked_at', 'dismissal_reason', 'invited_at', 'accepted_at',
             'rules_accepted_at', 'rules_version', 'last_login_at', 'last_login_device', 'hints_seen',
         ]));
         Schema::table('users', fn (Blueprint $table) => $table->dropColumn(['must_change_password', 'password_changed_at', 'last_login_at']));

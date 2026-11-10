@@ -86,8 +86,6 @@ class StaffManager
             $membership->forceFill([
                 'user_id' => $user->id,
                 'status' => MembershipStatus::Invited,
-                'store_ids' => $storeIds,
-                'store_flags' => $this->flags($storeIds, $data['store_flags'] ?? []),
                 'limits' => $this->limits($data['limits'] ?? []) ?: new \stdClass,
                 'payroll' => $this->payroll($data['payroll'] ?? []) ?: new \stdClass,
                 'position' => $role->title,
@@ -95,6 +93,7 @@ class StaffManager
                 'invited_at' => now(),
                 'created_by' => $by->id,
             ])->save();
+            $this->syncStores($membership, $storeIds, $data['store_flags'] ?? []);
             $this->assignRole($user, $role);
             $url = $this->issueLink($membership, Invitation::INVITE, $by);
             AuditLog::record('settings', 'member_invited', $membership, ['name' => $name, 'role' => $role->title], $by);
@@ -127,9 +126,7 @@ class StaffManager
                 $user->forceFill(['name' => trim($data['name'])])->save();
             }
             if (array_key_exists('store_ids', $data)) {
-                $storeIds = $this->stores($data['store_ids']);
-                $membership->store_ids = $storeIds;
-                $membership->store_flags = $this->flags($storeIds, $data['store_flags'] ?? []);
+                $this->syncStores($membership, $this->stores($data['store_ids']), $data['store_flags'] ?? []);
             }
             if (array_key_exists('limits', $data)) {
                 $membership->limits = $this->limits($data['limits']) ?: new \stdClass;
@@ -336,6 +333,16 @@ class StaffManager
         return $ids;
     }
 
+    /** Stores of the employee with the marks «Продажи» / «Финансы» (membership_stores, audit №10). */
+    private function syncStores(Membership $membership, array $storeIds, array $flags): void
+    {
+        $membership->stores()->whereNotIn('store_id', $storeIds)->delete();
+        foreach ($this->flags($storeIds, $flags) as $id => $f) {
+            $membership->stores()->updateOrCreate(['store_id' => (int) $id], ['can_sales' => $f['sales'], 'can_finance' => $f['finance']]);
+        }
+        $membership->unsetRelation('stores');
+    }
+
     private function flags(array $storeIds, array $flags): array
     {
         $out = [];
@@ -414,7 +421,7 @@ class StaffManager
     {
         return [
             'role' => $this->roleOf($m->user)?->title,
-            'stores' => $m->store_ids,
+            'stores' => $m->stores()->get(['store_id', 'can_sales', 'can_finance'])->toArray(),
             'limits' => $m->limits,
             'payroll' => $m->payroll,
         ];

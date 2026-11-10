@@ -78,8 +78,8 @@ class ShellServiceProvider extends ServiceProvider
                 if ($causer && $entry->getAttribute('role') === null) {
                     $causer->unsetRelation('roles');
                     $entry->setAttribute('role', $causer->roles()->first()?->title);
-                    $stores = Membership::query()->where('user_id', $causer->id)->value('store_ids');
-                    $stores = is_string($stores) ? json_decode($stores, true) : $stores;
+                    $stores = \App\Domain\Tenancy\Models\MembershipStore::query()
+                        ->whereIn('membership_id', Membership::query()->where('user_id', $causer->id)->select('id'))->pluck('store_id')->all();
                     if (is_array($stores) && count($stores) === 1 && $entry->getAttribute('store_id') === null) {
                         $entry->setAttribute('store_id', (int) $stores[0]);
                     }

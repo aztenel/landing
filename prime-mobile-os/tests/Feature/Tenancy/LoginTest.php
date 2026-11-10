@@ -23,6 +23,6 @@ it('logs into the ERP by phone and password and gets the organization context', 
         ->assertHasNoErrors();
     $this->assertAuthenticatedAs($w->owner);
 
-    $this->get('/admin')->assertOk();
+    $this->get('http://'.config('prime.erp_domain').'/')->assertOk(); // the ERP lives at the root of its own domain (Э1, 04 §1)
     expect(CurrentOrganization::instance()->id())->toBe($w->org->id);
 });
