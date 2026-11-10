@@ -111,6 +111,29 @@ class UnitPassport extends Page
         }, __('Цена изменена'));
     }
 
+    public array $edit = ['imei1' => '', 'imei2' => '', 'delta' => '', 'reason' => ''];
+
+    /** «Исправить карточку» ИЗХ: IMEI typos (model and colour — in the next update of the screen). */
+    public function saveEdit(): void
+    {
+        $unit = $this->unit();
+        $changes = [];
+        foreach (['imei1', 'imei2'] as $f) {
+            $v = trim((string) $this->edit[$f]);
+            if ($v !== '' && \App\Support\Imei\Imei::normalize($v) !== (string) $unit->{$f}) {
+                $changes[$f] = $v;
+            }
+        }
+        $this->act(fn () => \App\Domain\Warehouse\Drafts\StockOpDraft::unitEdit($unit, $changes, (string) $this->edit['reason'])->post(auth()->user()), __('Карточка исправлена'));
+    }
+
+    /** «Корректировать себестоимость» КСБ (owner). */
+    public function saveCost(): void
+    {
+        $tenge = (int) str_replace([' ', "\u{00A0}"], '', (string) $this->edit['delta']);
+        $this->act(fn () => \App\Domain\Warehouse\Drafts\StockOpDraft::costAdjustment($this->unit(), Money::kzt($tenge), (string) $this->edit['reason'])->post(auth()->user()), __('Себестоимость изменена'));
+    }
+
     public function ready(): void
     {
         $this->act(fn () => app(UnitStatusService::class)->markReady($this->unit(), auth()->user()), __('Телефон готов к продаже'));

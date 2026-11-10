@@ -70,6 +70,11 @@
                     <button type="button" wire:click="decide('preparing')" class="{{ $btn }}">{{ __('На подготовку') }}</button>
                     <button type="button" wire:click="decide('defective')" class="{{ $btn }}">{{ __('Брак') }}</button>
                 @endif
+                @if (in_array($status, ['in_stock', 'preparing', 'defective', 'on_check']) && \App\Support\Ui\Access::allows('stock.write_off'))<a href="{{ \App\Filament\Warehouse\Pages\WriteOffs::getUrl(['unit' => $unit->id]) }}" class="{{ $btn }}">{{ __('Списать') }}</a>@endif
+                @if (in_array($status, ['in_stock', 'on_check', 'defective', 'preparing']) && \App\Support\Ui\Access::allows('stock.return_supplier'))<a href="{{ \App\Filament\Warehouse\Pages\WriteOffs::getUrl(['unit' => $unit->id, 'mode' => 'supplier']) }}" class="{{ $btn }}">{{ __('Вернуть поставщику') }}</a>@endif
+                @if ($status === 'sold')<a href="{{ \App\Filament\Warehouse\Pages\WarrantyCases::getUrl(['unit' => $unit->id]) }}" class="{{ $btn }}"><x-ui::icon name="shield" class="h-4 w-4" /> {{ __('Гарантийное обращение') }}</a>@endif
+                @if (! \App\Support\Ui\Access::instance()->decision('stock.unit_edit')->isDenied())<button type="button" wire:click="$set('modal', 'edit')" class="{{ $btn }}">{{ __('Исправить карточку') }}</button>@endif
+                @if (\App\Support\Ui\Access::allows('stock.cost_adjust') && ! in_array($status, ['sold', 'written_off', 'returned_to_supplier']))<button type="button" wire:click="$set('modal', 'cost')" class="{{ $btn }}">{{ __('Корректировать себестоимость') }}</button>@endif
                 <button type="button" disabled class="{{ $btn }} opacity-50" title="{{ __('Печать подключается с модулем печати') }}"><x-ui::icon name="printer" class="h-4 w-4" /> {{ __('Этикетка') }}</button>
             </div>
             @if ($error)<p class="text-sm text-bad" role="alert">{{ $error }}</p>@elseif ($flash)<p class="text-sm text-ok" role="status">{{ $flash }}</p>@endif
@@ -127,6 +132,24 @@
             <p class="p-6 text-sm text-muted-foreground">{{ __('Фото и показ на сайте подключаются с модулем сайта.') }}</p>
         @endif
     </div>
+
+    @if ($modal === 'edit' || $modal === 'cost')
+        <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 desk:items-center">
+            <div class="w-full space-y-3 rounded-t-2xl bg-card p-5 desk:w-[460px] desk:rounded-2xl" role="dialog">
+                @if ($modal === 'edit')
+                    <h3 class="text-lg font-semibold">{{ __('Исправить карточку') }}</h3>
+                    <label class="block text-sm">IMEI 1<input type="text" inputmode="numeric" wire:model="edit.imei1" class="num mt-1 w-full rounded-lg border-input bg-background text-base"></label>
+                    <label class="block text-sm">IMEI 2<input type="text" inputmode="numeric" wire:model="edit.imei2" class="num mt-1 w-full rounded-lg border-input bg-background text-base"></label>
+                @else
+                    <h3 class="text-lg font-semibold">{{ __('Корректировка себестоимости') }}</h3>
+                    <label class="block text-sm">{{ __('На сколько, ₸ (минус — уменьшить)') }}<input type="text" wire:model="edit.delta" class="num mt-1 w-full rounded-lg border-input bg-background text-base"></label>
+                @endif
+                <label class="block text-sm">{{ __('Причина') }}<input type="text" wire:model="edit.reason" class="mt-1 w-full rounded-lg border-input bg-background text-base"></label>
+                @if ($error)<p class="text-sm text-bad">{{ $error }}</p>@endif
+                <div class="flex justify-end gap-2"><button type="button" wire:click="$set('modal', null)" class="{{ $btn }}">{{ __('Отмена') }}</button><button type="button" wire:click="{{ $modal === 'edit' ? 'saveEdit' : 'saveCost' }}" class="h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-white">{{ __('Провести') }}</button></div>
+            </div>
+        </div>
+    @endif
 
     @if ($modal === 'price' || $modal === 'imei')
         <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 desk:items-center">
