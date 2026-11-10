@@ -16,7 +16,6 @@ enum ArticleCode: string
     case Transfer = 'transfer';
     case Deposit = 'deposit';
     case Withdrawal = 'withdrawal';
-    case FxDiff = 'fx_diff';
     case FxConvert = 'fx_convert';
     case CashDiff = 'cash_diff';
     case SupplierReturnDiff = 'supplier_return_diff';
@@ -46,7 +45,6 @@ enum ArticleCode: string
             self::Transfer => ['Перевод', 'system', false],
             self::Deposit => ['Внесение', 'system', false],
             self::Withdrawal => ['Изъятие владельцем', 'system', false],
-            self::FxDiff => ['Курсовая разница', 'system', true],
             self::FxConvert => ['Конвертация валюты', 'system', false],
             self::CashDiff => ['Недостача/излишек кассы', 'system', true],
             self::SupplierReturnDiff => ['Разница при возврате поставщику', 'system', true],

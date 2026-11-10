@@ -13,7 +13,6 @@ enum DebtKind: string
     case PrepaymentUse = 'prepayment_use';
     case Return = 'return';
     case Adjustment = 'adjustment';
-    case FxDiff = 'fx_diff';
     case Opening = 'opening';
     case Reversal = 'reversal';
 

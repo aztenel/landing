@@ -166,6 +166,8 @@ class CustomerReturnHandler extends AbstractDocumentHandler
         // amounts and permissions (TZ 03 §5.1 L7–L9)
         $phones = 0;
         $accessories = 0;
+        $hasPhone = false;
+        $hasAccessory = false;
         $prepared = [];
         foreach ($lines as $line) {
             $saleLine = SaleLine::query()->findOrFail($line->sale_line_id);
@@ -175,16 +177,26 @@ class CustomerReturnHandler extends AbstractDocumentHandler
                     .Money::kztMinor($this->calculator->remainingAmount($saleLine))->format());
             }
             $prepared[] = [$line, $saleLine, $amount];
-            $saleLine->stock_unit_id ? $phones += $amount : $accessories += $amount;
+            if ($amount < 0) {
+                throw PostingException::because('refund_negative', 'Сумма возврата не может быть отрицательной');
+            }
+            // the kind of goods decides which limits apply, not the amount (audit №47: a phone at 0 ₸ is still a phone)
+            if ($saleLine->stock_unit_id) {
+                $phones += $amount;
+                $hasPhone = true;
+            } else {
+                $accessories += $amount;
+                $hasAccessory = true;
+            }
         }
         // calendar days in the firm time zone (audit №49), not in UTC
         $tz = $ctx->organization->timezone;
         $days = (int) abs(CarbonImmutable::parse($saleDoc->occurred_at)->setTimezone($tz)->startOfDay()->diffInDays($ctx->occurredAt()->setTimezone($tz)->startOfDay()));
-        if ($phones > 0) {
+        if ($hasPhone) {
             $ctx->authorize('return.phone', Limit::ReturnPhone, $phones, 'return');
             $ctx->authorize('return.phone', Limit::ReturnDays, $days, 'return');
         }
-        if ($accessories > 0 || $phones === 0) {
+        if ($hasAccessory) {
             $ctx->authorize('return.accessory', Limit::ReturnAccessory, $accessories, 'return');
             $ctx->authorize('return.accessory', Limit::ReturnDays, $days, 'return');
         }
