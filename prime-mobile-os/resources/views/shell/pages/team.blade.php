@@ -48,6 +48,7 @@
                                         <div class="flex justify-end gap-1">
                                             @if ($m->status->value === 'active')
                                                 <button type="button" wire:click="staffAction({{ $m->id }}, 'password')" class="h-9 rounded-lg px-2.5 text-xs hover:bg-muted">{{ __('Сбросить пароль') }}</button>
+                                                @if (\App\Support\Ui\Access::isOwner())<button type="button" wire:click="staffAction({{ $m->id }}, '2fa')" wire:confirm="{{ __('Сбросить вход по коду? Сотрудник настроит его заново при следующем входе') }}" class="h-9 rounded-lg px-2.5 text-xs hover:bg-muted">{{ __('Сбросить код входа') }}</button>@endif
                                                 <button type="button" wire:click="staffAction({{ $m->id }}, 'block')" wire:confirm="{{ __('Заблокировать сотрудника? Он сразу потеряет доступ') }}" class="h-9 rounded-lg px-2.5 text-xs text-bad hover:bg-bad/10">{{ __('Заблокировать') }}</button>
                                             @elseif ($m->status->value === 'blocked')
                                                 <button type="button" wire:click="staffAction({{ $m->id }}, 'unblock')" class="h-9 rounded-lg px-2.5 text-xs hover:bg-muted">{{ __('Вернуть доступ') }}</button>

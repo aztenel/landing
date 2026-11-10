@@ -7,6 +7,7 @@ use App\Filament\Shell\Pages\Auth\Login;
 use App\Http\Middleware\Shell\EnsureDeviceAllowed;
 use App\Http\Middleware\Shell\EnsurePasswordChanged;
 use App\Http\Middleware\Shell\EnsureScreenUnlocked;
+use App\Http\Middleware\Shell\EnsureTwoFactor;
 use App\Http\Middleware\Shell\ErpResponseHeaders;
 use App\Support\Ui\Accent;
 use App\Support\Ui\ErpSearch;
@@ -66,6 +67,7 @@ class ShellPlugin implements Plugin
             ->authMiddleware([
                 EnsureDeviceAllowed::class,
                 EnsurePasswordChanged::class,
+                EnsureTwoFactor::class,
                 EnsureScreenUnlocked::class,
                 ErpResponseHeaders::class,
             ], isPersistent: true);

@@ -62,10 +62,12 @@ class ScreenLock
         }
     }
 
-    /** @return bool true = unlocked; false = wrong password (after 5 → the caller logs out) */
+    /** @return bool true = unlocked; false = wrong PIN / password (after 5 → the caller logs out). PIN — of this device (TZ 03 §7.1). */
     public function unlock(Session $session, User $user, string $password): bool
     {
-        if (! Hash::check($password, $user->getAuthPassword())) {
+        $device = app(DeviceRegistry::class)->current(request());
+        $byPin = app(Pins::class)->check($user, $device, $password);
+        if (! $byPin && ! Hash::check($password, $user->getAuthPassword())) {
             $session->put(self::FAILS, (int) $session->get(self::FAILS, 0) + 1);
 
             return false;

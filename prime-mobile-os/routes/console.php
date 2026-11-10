@@ -40,3 +40,6 @@ Schedule::command('prime:summaries')->everyMinute()->withoutOverlapping();
 
 // Site promotions: start and finish by the clock (TZ 05 §6.3)
 Schedule::command('prime:promotions-tick')->everyMinute()->withoutOverlapping();
+
+// Backups (architecture §6): the owner is told if the nightly copy did not pass (production only)
+Schedule::command('prime:backup-status')->hourly()->withoutOverlapping();

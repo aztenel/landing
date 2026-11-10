@@ -30,6 +30,12 @@ return [
         'ip_max_attempts' => 20,          // TZ 03 §7.4: 20 errors from one IP per hour
     ],
 
+    /*
+     | 2FA by an authenticator app (TZ 03 §7.1): mandatory for owner, admin, accountant. Switched off only in the
+     | automated tests (phpunit.xml) — the dedicated 2FA tests turn it on.
+     */
+    'two_factor' => (bool) env('PRIME_TWO_FACTOR', true),
+
     /* Invitation / password reset links (TZ 03 §14.2, §7.5). */
     'invitation_hours' => 72,
     'password_reset_hours' => 24,

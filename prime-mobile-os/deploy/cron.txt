@@ -1,0 +1,5 @@
+# crontab -u prime -e
+* * * * * cd /var/www/prime/current && php artisan schedule:run >> /dev/null 2>&1
+# nightly backup 02:30 Almaty (before the 03:00–03:40 checks), restore check on Sunday 05:00
+30 2 * * * /var/www/prime/current/deploy/backup/backup.sh >> /var/www/prime/shared/storage/logs/backup.log 2>&1
+0 5 * * 0 /var/www/prime/current/deploy/backup/restore-check.sh >> /var/www/prime/shared/storage/logs/backup.log 2>&1

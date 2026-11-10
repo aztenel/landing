@@ -43,7 +43,7 @@ class ScreenLockController extends Controller
                 'message' => __('Слишком много попыток. Войдите заново с телефоном и паролем')], 401);
         }
 
-        return response()->json(['ok' => false, 'message' => __('Пароль не подходит')], 422);
+        return response()->json(['ok' => false, 'message' => __('PIN или пароль не подходит')], 422);
     }
 
     public function activity(): Response

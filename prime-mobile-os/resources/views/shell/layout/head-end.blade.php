@@ -10,3 +10,5 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 @vite('resources/js/erp.js')
+{{-- PWA: a service worker for the «Нет связи» page and static files only (public/sw.js) — no data is cached --}}
+<script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); }); }</script>

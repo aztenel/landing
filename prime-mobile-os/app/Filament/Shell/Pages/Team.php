@@ -6,11 +6,14 @@ use App\Domain\Shell\Models\Device;
 use App\Domain\Shell\Services\DeviceRegistry;
 use App\Domain\Shell\Services\RoleEditor;
 use App\Domain\Shell\Services\StaffManager;
+use App\Domain\Shell\Services\TwoFactor;
 use App\Domain\Tenancy\Models\Membership;
 use App\Domain\Tenancy\Models\Store;
 use App\Filament\Shell\Concerns\HasErpAccess;
+use App\Models\User;
 use App\Support\Exceptions\UserFacingException;
 use App\Support\Phone\Phone;
+use App\Support\Tenancy\CurrentOrganization;
 use App\Support\Ui\Access;
 use App\Support\Ui\MenuGroup;
 use Filament\Notifications\Notification;
@@ -106,6 +109,9 @@ class Team extends Page
                 'restore' => $manager->restore($membership, auth()->user()),
                 'password' => $this->inviteLink = $manager->passwordLink($membership, auth()->user()),
                 'logout' => $manager->logoutEverywhere($membership, auth()->user()),
+                // TZ 03 §7.5 п. 2: lost the phone with the app — the owner resets 2FA, the person sets it up again
+                '2fa' => Access::isOwner() ? app(TwoFactor::class)->reset(User::query()->findOrFail($membership->user_id), auth()->user())
+                    : throw UserFacingException::because('owner_only', __('Сбросить вход по коду может только владелец')),
             };
             Notification::make()->success()->title(__('Готово'))->send();
         } catch (UserFacingException $e) {
@@ -123,7 +129,7 @@ class Team extends Page
         if (! $roleId) {
             return;
         }
-        $role = Role::query()->where('organization_id', \App\Support\Tenancy\CurrentOrganization::instance()->requireId())->findOrFail($roleId);
+        $role = Role::query()->where('organization_id', CurrentOrganization::instance()->requireId())->findOrFail($roleId);
         foreach (app(RoleEditor::class)->matrix($role) as $group) {
             foreach ($group['items'] as $item) {
                 // Livewire paths use dots: «sale.create» is stored as «sale__create» (see key())
@@ -137,7 +143,7 @@ class Team extends Page
 
     public function saveRole(): void
     {
-        $role = Role::query()->where('organization_id', \App\Support\Tenancy\CurrentOrganization::instance()->requireId())->findOrFail($this->roleId);
+        $role = Role::query()->where('organization_id', CurrentOrganization::instance()->requireId())->findOrFail($this->roleId);
         $units = $this->limitUnits($role);
         $values = [];
         foreach ($this->limits as $code => $value) {

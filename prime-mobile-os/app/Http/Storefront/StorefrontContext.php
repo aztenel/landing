@@ -6,6 +6,7 @@ use App\Domain\Tenancy\Models\Organization;
 use App\Support\Tenancy\CurrentOrganization;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Public site context (TZ 05 §1): the firm by the domain of the request (settings.storefront.domain; one firm today —
@@ -16,6 +17,9 @@ final class StorefrontContext
 {
     public function handle(Request $request, Closure $next)
     {
+        if (config('database.connections.pgsql_site.username')) {
+            DB::setDefaultConnection('pgsql_site');   // the site role cannot read the warehouse, cost or customers
+        }
         $host = $request->getHost();
         $org = Organization::query()->where('is_active', true)->get()
             ->first(fn ($o) => ($o->settings['storefront']['domain'] ?? null) === $host)
