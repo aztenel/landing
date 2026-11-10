@@ -27,7 +27,10 @@ enum DocumentType: string
     case DebtAdjustment = 'debt_adjustment';
     case CashMove = 'cash_move';
     case FxConvert = 'fx_convert';
-    case ShiftClose = 'shift_close';
+    case CashAdjustment = 'cash_adjustment';   // РКС: cash difference at shift open/close or manual (audit №57)
+    case CostEntry = 'cost_entry';             // ВСБ: purchase cost entered later (audit №4)
+    case LegacyReturn = 'legacy_return';       // ВДП: return of a phone sold before the switch from sfon (audit №3)
+    case BonusExpire = 'bonus_expire';         // БСГ: nightly system document (audit №54)
     case BonusManual = 'bonus_manual';
     case Order = 'order';
     case OpeningBalance = 'opening_balance';
@@ -60,7 +63,10 @@ enum DocumentType: string
             self::DebtAdjustment => 'Корректировка долга',
             self::CashMove => 'Движение денег',
             self::FxConvert => 'Конвертация валюты',
-            self::ShiftClose => 'Закрытие смены',
+            self::CashAdjustment => 'Расхождение кассы',
+            self::CostEntry => 'Внесение себестоимости',
+            self::LegacyReturn => 'Возврат по продаже до перехода',
+            self::BonusExpire => 'Сгорание бонусов',
             self::BonusManual => 'Бонусы вручную',
             self::Order => 'Заказ',
             self::OpeningBalance => 'Входящие остатки',

@@ -11,6 +11,7 @@ enum MovementKind: string
     case TradeInIn = 'tradein_in';
     case PrepCost = 'prep_cost';
     case CostAdjustment = 'cost_adjustment';
+    case CostEntry = 'cost_entry';
     case Transfer = 'transfer';
     case WriteOff = 'write_off';
     case SupplierReturn = 'supplier_return';

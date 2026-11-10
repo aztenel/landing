@@ -266,8 +266,12 @@ class SaleHandler extends AbstractDocumentHandler
 
         $this->authorizeDiscount($ctx, $sale, $discountTotal, $listSubtotal);
         foreach ($lines as $line) {
-            $unknownCost = $line->stock_unit_id && $ctx->locks->unit((int) $line->stock_unit_id)->cost_unknown;
-            if (! $line->is_gift && ! $unknownCost && $amounts[$line->id] < $costs[$line->id]) {
+            if ($line->stock_unit_id && $ctx->locks->unit((int) $line->stock_unit_id)->cost_unknown) {
+                // nobody sells a phone without a purchase price, the owner neither (audit №4): the price is entered by ВСБ
+                $code = $ctx->locks->unit((int) $line->stock_unit_id)->public_code;
+                throw PostingException::because('cost_unknown', "Телефон {$code} ещё без себестоимости — продать нельзя. Сообщите администратору");
+            }
+            if (! $line->is_gift && $amounts[$line->id] < $costs[$line->id]) {
                 $ctx->authorize('sale.below_cost', approvalType: 'below_cost', message: 'Нужно разрешение владельца: цена ниже допустимой');
             }
         }

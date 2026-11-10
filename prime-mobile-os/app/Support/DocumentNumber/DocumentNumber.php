@@ -33,7 +33,10 @@ final class DocumentNumber
         'debt_payment_in' => 'ОДК',
         'debt_payment_out' => 'ОДП',
         'cash_move' => 'ДДС',
-        'shift_close' => 'СМН',
+        'cash_adjustment' => 'РКС',
+        'cost_entry' => 'ВСБ',
+        'legacy_return' => 'ВДП',
+        'bonus_expire' => 'БСГ',
         'opening_balance' => 'ВХО',
         'unit_edit' => 'ИЗХ',
     ];
@@ -41,6 +44,7 @@ final class DocumentNumber
     /** Numbered entities that are not accounting documents (no journals). */
     public const EXTRA_SERIES = [
         'warranty_case' => 'ГРО',
+        'shift' => 'СМН',
     ];
 
     public static function prefixFor(string $type): string

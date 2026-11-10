@@ -32,6 +32,7 @@ class LedgerServiceProvider extends ServiceProvider
     public const CORE_HANDLERS = [
         'opening_balance' => OpeningBalanceHandler::class,
         'purchase' => PurchaseHandler::class,
+        'cost_entry' => \App\Domain\Inventory\Posting\CostEntryHandler::class,
         'sale' => SaleHandler::class,
         'customer_return' => CustomerReturnHandler::class,
         'expense' => ExpenseHandler::class,
