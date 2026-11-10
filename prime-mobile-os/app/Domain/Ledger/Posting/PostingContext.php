@@ -89,7 +89,7 @@ final class PostingContext
         return $this->access->can($this->actor, $permission);
     }
 
-    /** Is the store within the acting user's stores (memberships.store_ids, empty = all; TZ 03 §1, §18 p.4)? */
+    /** Is the store within the acting user's stores (membership_stores; the owner — every store; TZ 03 §1, audit №10)? */
     public function actorMayUseStore(int $storeId): bool
     {
         if (! $this->membershipLoaded) {
@@ -97,7 +97,7 @@ final class PostingContext
             $this->membershipLoaded = true;
         }
 
-        return (bool) $this->membership?->isActive() && $this->membership->allowsStore($storeId);
+        return (bool) $this->membership?->isActive() && ($this->isOwner() || $this->membership->allowsStore($storeId));
     }
 
     /**

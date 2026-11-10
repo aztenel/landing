@@ -44,7 +44,6 @@ return new class extends Migration
             $table->foreignId('organization_id')->constrained()->restrictOnDelete();
             $table->foreignId('user_id')->constrained()->restrictOnDelete();
             $table->string('status', 16)->default('active');
-            $table->jsonb('store_ids')->default('[]');    // stores the member works in (scope «свой магазин»)
             $table->jsonb('limits')->default('{}');       // personal limits, TZ 03 §5.3: {"L1": 1000000}
             $table->string('position')->nullable();
             $table->date('started_on')->nullable();
@@ -54,6 +53,19 @@ return new class extends Migration
             $table->unique(['organization_id', 'user_id']);
         });
         DB::statement("ALTER TABLE memberships ADD CONSTRAINT memberships_status_check CHECK (status IN ('invited','active','blocked','dismissed'))");
+
+        // stores an employee works in, with the marks «Продажи» / «Финансы» of TZ 03 §1 (audit №10).
+        // No row = no access to the store; the owner works in every store without rows.
+        Schema::create('membership_stores', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('organization_id')->constrained()->restrictOnDelete();
+            $table->foreignId('membership_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('store_id')->constrained()->restrictOnDelete();
+            $table->boolean('can_sales')->default(true);
+            $table->boolean('can_finance')->default(true);
+            $table->timestampsTz();
+            $table->unique(['membership_id', 'store_id']);
+        });
 
         // Spatie roles are per organization (teams = organizations). Add a human title and the owner flag.
         Schema::table('roles', function (Blueprint $table) {
@@ -82,6 +94,7 @@ return new class extends Migration
             $table->dropForeign(['organization_id']);
             $table->dropColumn(['title', 'is_owner']);
         });
+        Schema::dropIfExists('membership_stores');
         Schema::dropIfExists('memberships');
         Schema::dropIfExists('stores');
         Schema::dropIfExists('organizations');

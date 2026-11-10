@@ -175,6 +175,19 @@ final class PermissionCatalog
         return array_keys(self::MATRIX);
     }
 
+    /**
+     * Which mark of the employee's store a right needs (TZ 03 §1, audit №10): «Продажи» for selling and trade-in,
+     * «Финансы» for money; null = only access to the store.
+     */
+    public static function storeScope(string $code): ?string
+    {
+        return match (self::group($code)) {
+            'sale', 'tradein' => 'sales',
+            'money' => 'finance',
+            default => null,
+        };
+    }
+
     public static function exists(string $code): bool
     {
         return isset(self::MATRIX[$code]);

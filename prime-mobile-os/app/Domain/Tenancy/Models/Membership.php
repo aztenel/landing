@@ -8,6 +8,7 @@ use App\Support\Tenancy\BelongsToOrganization;
 use App\Support\Tenancy\TracksCreator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * User × organization: status, stores, personal limits (TZ 03 §1, §5.3). The role is a spatie role in the
@@ -15,18 +16,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $user_id
  * @property MembershipStatus $status
- * @property array<int> $store_ids
  * @property array<string, int|null> $limits
  */
 class Membership extends Model
 {
     use BelongsToOrganization, TracksCreator;
 
-    protected $fillable = ['organization_id', 'user_id', 'status', 'store_ids', 'limits', 'position', 'started_on', 'dismissed_at', 'created_by'];
+    protected $fillable = ['organization_id', 'user_id', 'status', 'limits', 'position', 'started_on', 'dismissed_at', 'created_by'];
 
     protected $attributes = [
         'status' => 'active',
-        'store_ids' => '[]',
         'limits' => '{}',
     ];
 
@@ -34,7 +33,6 @@ class Membership extends Model
     {
         return [
             'status' => MembershipStatus::class,
-            'store_ids' => 'array',
             'limits' => 'array',
             'started_on' => 'date',
             'dismissed_at' => 'datetime',
@@ -51,10 +49,27 @@ class Membership extends Model
         return $this->status === MembershipStatus::Active;
     }
 
-    /** Empty store list = all stores of the organization. */
-    public function allowsStore(?int $storeId): bool
+    public function stores(): HasMany
     {
-        return $storeId === null || $this->store_ids === [] || in_array($storeId, array_map('intval', $this->store_ids), true);
+        return $this->hasMany(MembershipStore::class);
+    }
+
+    /**
+     * May the employee work in this store (audit №10)? No row = no access. $scope «sales» / «finance» also needs the
+     * mark «Продажи» / «Финансы» of that store (TZ 03 §1). The owner is checked by AccessChecker, not here.
+     */
+    public function allowsStore(?int $storeId, ?string $scope = null): bool
+    {
+        if ($storeId === null) {
+            return true;
+        }
+        $row = $this->stores->firstWhere('store_id', $storeId);
+
+        return $row !== null && match ($scope) {
+            'sales' => (bool) $row->can_sales,
+            'finance' => (bool) $row->can_finance,
+            default => true,
+        };
     }
 
     /** Personal limit override (TZ 03 §5.3). Returns [found, value]; value null = unlimited. */

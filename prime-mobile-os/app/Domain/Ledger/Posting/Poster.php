@@ -142,7 +142,7 @@ class Poster
         if (! Store::query()->whereKey($doc->store_id)->exists()) {
             throw PostingException::because('store_not_found', 'Магазин не найден в этой фирме');
         }
-        if (! $membership->allowsStore((int) $doc->store_id)) {
+        if (! $this->access->isOwner($actor) && ! $membership->allowsStore((int) $doc->store_id)) {
             throw AccessDenied::because('access_denied', 'Нет доступа к этому магазину');
         }
     }

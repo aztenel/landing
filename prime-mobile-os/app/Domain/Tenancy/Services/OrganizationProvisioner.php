@@ -66,10 +66,11 @@ class OrganizationProvisioner
     /**
      * Member with exactly one role (TZ 03 §2 p.3).
      *
-     * @param  list<int>  $storeIds  empty = all stores
+     * @param  list<int>|null  $storeIds  stores the employee works in («Продажи» and «Финансы» marked); null = every store
+     *                                   the firm has now. An empty list is refused: no store = no access (audit №10).
      * @param  array<string, int|null>  $limits  personal limits {"L1": 1000000}
      */
-    public function addMember(Organization $org, User $user, string $role, array $storeIds = [], array $limits = [], ?string $position = null): Membership
+    public function addMember(Organization $org, User $user, string $role, ?array $storeIds = null, array $limits = [], ?string $position = null): Membership
     {
         if (! array_key_exists($role, RoleTemplates::TITLES)) {
             throw new InvalidArgumentException("Unknown role {$role}");
@@ -77,8 +78,19 @@ class OrganizationProvisioner
 
         return CurrentOrganization::instance()->run($org, function () use ($user, $role, $storeIds, $limits, $position) {
             $membership = Membership::query()->updateOrCreate(['user_id' => $user->id], [
-                'status' => MembershipStatus::Active, 'store_ids' => $storeIds, 'limits' => $limits ?: new \stdClass, 'position' => $position,
+                'status' => MembershipStatus::Active, 'limits' => $limits ?: new \stdClass, 'position' => $position,
             ]);
+            if ($role !== RoleTemplates::OWNER) {
+                $storeIds ??= Store::query()->pluck('id')->map(fn ($id) => (int) $id)->all();
+                if ($storeIds === []) {
+                    throw new InvalidArgumentException('An employee needs at least one store.');
+                }
+                $membership->stores()->whereNotIn('store_id', $storeIds)->delete();
+                foreach ($storeIds as $storeId) {
+                    $membership->stores()->updateOrCreate(['store_id' => $storeId], ['can_sales' => true, 'can_finance' => true]);
+                }
+                $membership->unsetRelation('stores');
+            }
             $user->unsetRelation('roles');
             $user->syncRoles([$role]);
 

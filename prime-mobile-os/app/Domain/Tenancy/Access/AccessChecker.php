@@ -23,17 +23,23 @@ class AccessChecker
         if (! $membership || ! $membership->isActive()) {
             return AccessDecision::denied($permission, 'Доступ закрыт. Обратитесь к владельцу');
         }
-        if (! $membership->allowsStore($storeId)) {
-            return AccessDecision::denied($permission, 'Нет доступа к этому магазину');
-        }
 
         if (! PermissionCatalog::exists($permission)) {
             return AccessDecision::denied($permission, 'Нет права: '.$permission);
         }
         $role = $this->role($user);
-        // The owner has every right of the catalog, including rights added later by new modules (audit №23).
+        // The owner has every right of the catalog, including rights added later by new modules (audit №23), in every store.
         if ($role?->is_owner) {
             return AccessDecision::allowed($permission);
+        }
+        // a store the employee works in, with the mark «Продажи» / «Финансы» when the right needs it (audit №10)
+        $scope = PermissionCatalog::storeScope($permission);
+        if (! $membership->allowsStore($storeId, $scope)) {
+            return AccessDecision::denied($permission, match ($scope) {
+                'sales' => 'Нет доступа к продажам в этом магазине',
+                'finance' => 'Нет доступа к деньгам этого магазина',
+                default => 'Нет доступа к этому магазину',
+            });
         }
         if (! $role || ! $role->hasPermissionTo($permission)) {
             return AccessDecision::denied($permission, 'Нет права: '.PermissionCatalog::title($permission));

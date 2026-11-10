@@ -113,3 +113,21 @@ it('gives the owner every right of the catalog, also rights added later (audit �
     app(\App\Domain\Tenancy\Access\RoleProvisioner::class)->installFor($w->org);
     expect($owner->fresh()->hasPermissionTo('period.view'))->toBeTrue();
 });
+
+it('checks the stores of an employee with the marks «Продажи» and «Финансы»; no store = no access (audit №10)', function () {
+    $w = world();
+    $access = app(AccessChecker::class);
+    $other = \App\Domain\Tenancy\Models\Store::query()->create(['name' => 'ТРЦ «Мега»']);
+
+    expect($access->decide($w->seller, 'sale.create', storeId: $w->store->id)->isAllowed())->toBeTrue()
+        ->and($access->decide($w->seller, 'sale.create', storeId: $other->id)->isAllowed())->toBeFalse()
+        ->and($access->decide($w->owner, 'sale.create', storeId: $other->id)->isAllowed())->toBeTrue();
+
+    // «Финансы» off in the store: no cash expense there, selling still works
+    Membership::query()->where('user_id', $w->seller->id)->firstOrFail()->stores()->update(['can_finance' => false]);
+    expect($access->decide($w->seller, 'expense.create', storeId: $w->store->id)->isAllowed())->toBeFalse()
+        ->and($access->decide($w->seller, 'sale.create', storeId: $w->store->id)->isAllowed())->toBeTrue();
+
+    expect(fn () => app(\App\Domain\Tenancy\Services\OrganizationProvisioner::class)
+        ->addMember($w->org, \App\Models\User::factory()->create(), RoleTemplates::SELLER, []))->toThrow(InvalidArgumentException::class);
+});
