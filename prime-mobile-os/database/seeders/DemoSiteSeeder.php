@@ -29,6 +29,7 @@ class DemoSiteSeeder extends Seeder
         $owner = User::query()->where('phone', '+77010000001')->firstOrFail();
         $settings = $org->settings ?? [];
         $settings['storefront']['enabled'] = true;
+        $settings['storefront']['city_ru'] = $settings['storefront']['city_kk'] = 'Астана';   // the demo shop is in Astana
         $org->settings = $settings;
         $org->save();
         CurrentOrganization::instance()->set($org->refresh());

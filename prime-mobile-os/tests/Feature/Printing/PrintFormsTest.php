@@ -26,7 +26,7 @@ it('prints Ф1: not fiscal, IMEI, warranty date, QR link; the second print is a 
     [$w, $unit, $sale] = printWorld();
     $this->actingAs($w->owner);
     $html = $this->get(route('erp.print.sale', $sale))->assertOk()->getContent();
-    expect($html)->toContain($sale->number)->toContain('НЕ ЯВЛЯЕТСЯ ФИСКАЛЬНЫМ ЧЕКОМ')->toContain($unit->imei1)->toContain('Гарантия до '.now()->addMonthsNoOverflow(12)->format('d.m.Y'))
+    expect($html)->toContain($sale->number)->toContain('НЕ ЯВЛЯЕТСЯ ФИСКАЛЬНЫМ ЧЕКОМ')->toContain($unit->imei1)->toContain('Гарантия до '.now()->setTimezone($w->org->timezone)->addMonthsNoOverflow(12)->format('d.m.Y'))
         ->toContain('В долг')->toContain('<svg')->not->toContain('ДУБЛИКАТ');
     expect($this->get(route('erp.print.sale', $sale))->getContent())->toContain('КӨШІРМЕ / ДУБЛИКАТ');
     expect(DB::table('activity_log')->where('log_name', 'print')->count())->toBe(2);
@@ -49,8 +49,8 @@ it('gives the buyer an electronic receipt by a secret link without login, withou
 it('prints the warranty card Ф3, the return Ф2 and the debt receipt Ф11', function () {
     [$w, $unit, $sale] = printWorld();
     $this->actingAs($w->owner);
-    $this->get(route('erp.print.warranty', $sale))->assertOk()->assertSee('ГАРАНТИЙНЫЙ ТАЛОН')->assertSee($unit->imei1)->assertSee(now()->addMonthsNoOverflow(12)->format('d.m.Y'));
-    $this->get(route('erp.print.debt', $sale))->assertOk()->assertSee('сто тысяч тенге')->assertSee(now()->addDays(10)->format('d.m.Y'));
+    $this->get(route('erp.print.warranty', $sale))->assertOk()->assertSee('ГАРАНТИЙНЫЙ ТАЛОН')->assertSee($unit->imei1)->assertSee(now()->setTimezone($w->org->timezone)->addMonthsNoOverflow(12)->format('d.m.Y'));
+    $this->get(route('erp.print.debt', $sale))->assertOk()->assertSee('сто тысяч тенге')->assertSee(now()->addDays(10)->format('d.m.Y'));   // the due date is the date given at the sale (a date picker in the UI)
 
     $cashSale = SaleDraft::make($w->store, $w->owner)->accessory($w->case, 1, Money::kzt(9000))->cash(Money::kzt(9000))->post($w->owner);
     $line = SaleLine::query()->where('document_id', $cashSale->id)->first();

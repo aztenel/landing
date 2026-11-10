@@ -26,7 +26,9 @@ beforeEach(fn () => Filament::setCurrentPanel(Filament::getPanel('admin')));
 
 function dayPeriod($w, $day): Period
 {
-    return Period::make('custom', $w->org->timezone, $day->toDateString(), $day->toDateString());
+    $date = $day->copy()->setTimezone($w->org->timezone)->toDateString();   // the firm's day, not the UTC one
+
+    return Period::make('custom', $w->org->timezone, $date, $date);
 }
 
 it('28: a repeated trade-in of a phone we sold — the same unit, the passport shows the sale and the trade-in act', function () {
@@ -145,7 +147,7 @@ it('45: October is closed — the admin cannot post a sale on 30.10; the reversa
         ->unit($w->phone(cost: Money::kzt(400000)), Money::kzt(549000))->cash(Money::kzt(549000))->post($w->admin))
         ->toThrow(\App\Domain\Ledger\Exceptions\PeriodClosed::class, 'Период закрыт по 31.10.2026');
     $rev = app(Reverser::class)->reverse($old, ReversalReason::InputError, null, $w->owner);
-    expect($rev->occurred_at->toDateString())->toBe(now()->setTimezone($w->org->timezone)->toDateString());
+    expect($rev->occurred_at->copy()->setTimezone($w->org->timezone)->toDateString())->toBe(now()->setTimezone($w->org->timezone)->toDateString());
 });
 
 it('50: an IMEI and a customer of the firm «Тест» are not found in Prime Mobile; the intake only warns «встречается в другой фирме», without the name', function () {
