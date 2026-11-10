@@ -266,7 +266,7 @@ chown -h prime:www-data $BASE/current
 svc php$PHPV-fpm
 cp "$NEW/deploy/supervisor/prime.conf" /etc/supervisor/conf.d/prime.conf
 svc supervisor
-for i in $(seq 1 15); do supervisorctl status >/dev/null 2>&1; [ $? -ne 4 ] && [ -S /var/run/supervisor.sock ] && break; sleep 1; done
+for i in $(seq 1 15); do [ -S /var/run/supervisor.sock ] && break; sleep 1; done
 if [ ! -S /var/run/supervisor.sock ] && [ ! -d /run/systemd/system ]; then
     supervisord -c /etc/supervisor/supervisord.conf && sleep 2                     # containers without systemd
 fi
