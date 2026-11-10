@@ -2,6 +2,8 @@
 
 namespace App\Domain\Ledger\Posting;
 
+use App\Domain\Ledger\Models\InventoryMovement;
+use App\Support\Outbox\Outbox;
 use App\Domain\Ledger\Enums\DocumentStatus;
 use App\Domain\Ledger\Enums\DocumentType;
 use App\Domain\Ledger\Events\DocumentPosted;
@@ -103,6 +105,12 @@ class Poster
                 ->causedBy($actor)
                 ->withProperties(['organization_id' => $organization->id, 'type' => $doc->type->value, 'number' => $doc->number])
                 ->log('posted');
+
+            // reliable announcement for the site and other listeners, in this very transaction (audit №5)
+            Outbox::record('document.posted', [
+                'document_id' => $doc->id, 'type' => $doc->type->value, 'number' => $doc->number,
+                'stock_unit_ids' => InventoryMovement::query()->where('document_id', $doc->id)->whereNotNull('stock_unit_id')->distinct()->pluck('stock_unit_id')->all(),
+            ], 'document', $doc->id);
 
             $id = $doc->id;
             $orgId = $organization->id;

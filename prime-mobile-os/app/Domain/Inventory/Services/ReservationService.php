@@ -2,6 +2,7 @@
 
 namespace App\Domain\Inventory\Services;
 
+use App\Support\Outbox\Outbox;
 use App\Domain\Inventory\Enums\UnitAction;
 use App\Domain\Inventory\Enums\UnitStatus;
 use App\Domain\Inventory\Models\StockUnit;
@@ -49,6 +50,7 @@ class ReservationService
                 'reserved_at' => now(), 'expires_at' => now()->addMinutes($minutes),
             ]);
             $locked->forceFill(['status' => UnitStatus::Reserved->value])->save();
+            Outbox::record('unit.changed', ['stock_unit_id' => $locked->id, 'action' => 'reserve', 'status' => UnitStatus::Reserved->value], 'stock_unit', $locked->id);
 
             return $reservation;
         });
@@ -70,6 +72,7 @@ class ReservationService
             if ($unit->status === UnitStatus::Reserved) {
                 UnitTransitions::assert(UnitStatus::Reserved, UnitStatus::InStock, UnitAction::ReleaseReservation);
                 $unit->forceFill(['status' => UnitStatus::InStock->value])->save();
+                Outbox::record('unit.changed', ['stock_unit_id' => $unit->id, 'action' => 'release', 'status' => UnitStatus::InStock->value], 'stock_unit', $unit->id);
             }
         });
     }

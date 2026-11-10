@@ -2,6 +2,7 @@
 
 namespace App\Domain\Ledger\Posting;
 
+use App\Support\Outbox\Outbox;
 use App\Domain\Inventory\Location;
 use App\Domain\Ledger\Enums\DocumentStatus;
 use App\Domain\Ledger\Enums\DocumentType;
@@ -173,6 +174,11 @@ class Reverser
                     'reason' => $reason->value, 'reason_text' => $reasonText,
                 ])
                 ->log('reversed');
+
+            Outbox::record('document.reversed', [
+                'document_id' => $orig->id, 'reversal_document_id' => $reversal->id, 'type' => $orig->type->value, 'number' => $orig->number,
+                'stock_unit_ids' => InventoryMovement::query()->where('document_id', $reversal->id)->whereNotNull('stock_unit_id')->distinct()->pluck('stock_unit_id')->all(),
+            ], 'document', $orig->id);
 
             $origId = $orig->id;
             $revId = $reversal->id;

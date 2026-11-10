@@ -2,6 +2,7 @@
 
 namespace App\Domain\Inventory\Services;
 
+use App\Support\Outbox\Outbox;
 use App\Domain\Inventory\Enums\UnitAction;
 use App\Domain\Inventory\Enums\UnitStatus;
 use App\Domain\Inventory\Models\StockUnit;
@@ -66,6 +67,7 @@ class UnitStatusService
             $from = $locked->status;
             UnitTransitions::assert($from, $to, $action);
             $locked->forceFill(['status' => $to->value] + $extra)->save();
+            Outbox::record('unit.changed', ['stock_unit_id' => $locked->id, 'action' => $action->value, 'status' => $to->value], 'stock_unit', $locked->id);
             activity('stock')->performedOn($locked)->causedBy($user)
                 ->withProperties(['from' => $from?->value, 'to' => $to->value, 'action' => $action->value])
                 ->log('status_changed');
