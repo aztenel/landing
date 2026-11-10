@@ -266,8 +266,12 @@ chown -h prime:www-data $BASE/current
 svc php$PHPV-fpm
 cp "$NEW/deploy/supervisor/prime.conf" /etc/supervisor/conf.d/prime.conf
 svc supervisor
-sleep 2
-supervisorctl reread >/dev/null; supervisorctl update >/dev/null
+for i in $(seq 1 15); do supervisorctl status >/dev/null 2>&1; [ $? -ne 4 ] && [ -S /var/run/supervisor.sock ] && break; sleep 1; done
+if [ ! -S /var/run/supervisor.sock ] && [ ! -d /run/systemd/system ]; then
+    supervisord -c /etc/supervisor/supervisord.conf && sleep 2                     # containers without systemd
+fi
+[ -S /var/run/supervisor.sock ] || die "supervisor не запустился: systemctl status supervisor"
+supervisorctl reread >/dev/null && supervisorctl update >/dev/null
 supervisorctl restart 'prime-queue:*' prime-outbox >/dev/null || warn "фоновые задачи не перезапустились — проверьте: supervisorctl status"
 # copies: on THIS server only (a demo). The real server keeps them at a second provider — deploy/README.md §6.
 mkdir -p /etc/prime /var/backups/prime-restic && chown prime:prime /var/backups/prime-restic
